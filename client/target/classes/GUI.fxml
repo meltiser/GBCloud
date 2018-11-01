@@ -1,0 +1,62 @@
+<?import javafx.scene.control.*?>
+<?import javafx.scene.layout.*?>
+<VBox fx:controller="ru.grigorev.client.Controller"
+      xmlns:fx="http://javafx.com/fxml" alignment="center" stylesheets="styles.css">
+    <MenuBar fx:id="menuBar">
+        <menus>
+            <Menu text="File">
+                <items>
+                    <MenuItem fx:id="menuOpen" onAction="#openFile" text="Open"/>
+                    <MenuItem text="Save"/>
+                    <MenuItem text="Save As"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem text="Exit"/>
+                </items>
+            </Menu>
+            <Menu text="Edit">
+                <items>
+                    <MenuItem text="Copy"/>
+                    <MenuItem text="Cut"/>
+                    <MenuItem text="Paste"/>
+                </items>
+            </Menu>
+            <Menu text="Help">
+                <items>
+                    <MenuItem text="Search" disable="true"/>
+                    <MenuItem text="Online Manual" visible="false"/>
+                    <SeparatorMenuItem/>
+                    <MenuItem text="About" onAction="#showAbout"/>
+                </items>
+            </Menu>
+        </menus>
+    </MenuBar>
+    <HBox VBox.vgrow="ALWAYS">
+
+        <VBox HBox.hgrow="ALWAYS">
+            <ListView fx:id="clientListView" VBox.vgrow="ALWAYS" onMouseClicked="#clearSelection"/>
+            <HBox>
+                <Button fx:id="clientSendButton" text="Send file" onAction="#sendFile"
+                        HBox.hgrow="ALWAYS"/>
+                <Button fx:id="clientRefreshButton" text="Refresh" onAction="#refreshList"
+                        HBox.hgrow="ALWAYS"/>
+                <Button fx:id="clientDeleteButton" text="Delete file" onAction="#deleteFile"
+                        HBox.hgrow="ALWAYS"/>
+                <Button fx:id="clientAddSmthButton" text="ADD SMTH" onAction="#addSmth"
+                        HBox.hgrow="ALWAYS"/>
+            </HBox>
+        </VBox>
+
+        <VBox HBox.hgrow="ALWAYS">
+            <ListView fx:id="serverListView" VBox.vgrow="ALWAYS"/>
+            <HBox>
+                <Button text="Download file"
+                        HBox.hgrow="ALWAYS"/>
+                <Button fx:id="serverRefreshButton" text="Refresh" onAction="#refreshList"
+                        HBox.hgrow="ALWAYS"/>
+                <Button fx:id="serverDeleteButton" text="Delete file" onAction="#deleteFile"
+                        HBox.hgrow="ALWAYS"/>
+            </HBox>
+        </VBox>
+
+    </HBox>
+</VBox>
