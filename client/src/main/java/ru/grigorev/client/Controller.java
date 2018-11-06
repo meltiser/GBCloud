@@ -16,6 +16,9 @@ import javafx.scene.input.TransferMode;
 import javafx.stage.FileChooser;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+import ru.grigorev.client.logic.Connection;
+import ru.grigorev.common.Message;
+import ru.grigorev.common.MessageType;
 
 import java.awt.*;
 import java.io.File;
@@ -23,6 +26,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.ResourceBundle;
 
@@ -42,10 +46,96 @@ public class Controller implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        clientListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
-        serverListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        //clientListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
+        //serverListView.getSelectionModel().setSelectionMode(SelectionMode.MULTIPLE);
         initializeDragAndDropClientListView();
-        openAuth();
+        //openAuth();
+        initClientMainLoop();
+        refreshServerFilesList();
+    }
+
+    private void initClientMainLoop() {
+        Connection.init();
+        Thread t = new Thread(() -> {
+            try {
+                while (true) {
+                    Message message = Connection.receiveMessage();
+                    if (message.getType().equals(MessageType.FILE)) {
+                        Files.write(Paths.get("client/client_storage/" + message.getFileName()), message.getByteArr(), StandardOpenOption.CREATE);
+                        refreshClientsFilesList();
+                    }
+                    if (message.getType().equals(MessageType.REFRESH_RESPONSE)) {
+                        if (Platform.isFxApplicationThread()) {
+                            serverList.clear();
+                            serverList.addAll(message.getListFileNames());
+                            serverListView.setItems(serverList);
+                        } else {
+                            Platform.runLater(() -> {
+                                serverList.clear();
+                                serverList.addAll(message.getListFileNames());
+                                serverListView.setItems(serverList);
+                            });
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                e.printStackTrace();
+            } finally {
+                Connection.close();
+            }
+        });
+        t.setDaemon(true);
+        t.start();
+        clientListView.setItems(FXCollections.observableArrayList());
+        refreshClientsFilesList();
+    }
+
+    public void downloadFile(ActionEvent actionEvent) {
+        String selectedItem = serverListView.getSelectionModel().getSelectedItem();
+        if (selectedItem == null) {
+            return;
+        }
+        serverListView.getSelectionModel().clearSelection();
+        Connection.sendMessage(new Message(MessageType.FILE_REQUEST, selectedItem));
+
+        /*ObservableList<String> selectedItems = serverListView.getSelectionModel().getSelectedItems();
+        if (selectedItems == null) {
+            return;
+        }
+        serverListView.getSelectionModel().clearSelection();
+        if (selectedItems.isEmpty()) System.out.println("empty!");
+        for (String selectedItem : selectedItems) {
+            System.out.println(selectedItem); //!!!
+            Connection.sendMessage(new Message(MessageType.FILE_REQUEST, selectedItem));
+        }*/
+    }
+
+    public void refreshClientsFilesList() {
+        if (Platform.isFxApplicationThread()) {
+            try {
+                clientListView.getItems().clear();
+                Files.list(Paths.get("client/client_storage"))
+                        .map(p -> p.getFileName().toString())
+                        .forEach(o -> clientListView.getItems().add(o));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        } else {
+            Platform.runLater(() -> {
+                try {
+                    clientListView.getItems().clear();
+                    Files.list(Paths.get("client/client_storage"))
+                            .map(p -> p.getFileName().toString())
+                            .forEach(o -> clientListView.getItems().add(o));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            });
+        }
+    }
+
+    public void refreshServerFilesList() {
+        Connection.sendMessage(new Message(MessageType.REFRESH_REQUEST));
     }
 
     public void setPrimaryStage(Stage primaryStage) {
@@ -71,8 +161,7 @@ public class Controller implements Initializable {
         //TODO:
         Button pressedButton = (Button) actionEvent.getSource();
         if (pressedButton.getId().equals(clientRefreshButton.getId())) {
-            //clientListView.refresh();
-            clientList.clear();
+            refreshClientsFilesList();
         } else {
             //serverListView.refresh();
             serverList.clear();
@@ -84,23 +173,31 @@ public class Controller implements Initializable {
         fileChooser.setTitle("Open File");
         File file = fileChooser.showOpenDialog(primaryStage);
         if (file != null) {
-            clientList.add(file.getName());
-            clientListView.setItems(clientList);
+            try {
+                Files.copy(file.toPath(), Paths.get("client/client_storage/" + file.getName()), StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            refreshClientsFilesList();
         }
-    }
-
-    public void addSmth(ActionEvent actionEvent) {
-        double random = Math.random();
-        clientList.add(String.valueOf(random));
-        clientListView.setItems(clientList);
     }
 
     public void deleteFile(ActionEvent actionEvent) {
         Button pressedButton = (Button) actionEvent.getSource();
         if (pressedButton.getId().equals(clientDeleteButton.getId())) {
-            deleteSelectedInListView(clientListView, clientList);
+            String selectedItem = clientListView.getSelectionModel().getSelectedItem();
+            if (selectedItem == null) {
+                return;
+            }
+            clientListView.getSelectionModel().clearSelection();
+            try {
+                Files.delete(Paths.get("client/client_storage/" + selectedItem));
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            refreshClientsFilesList();
         } else {
-            deleteSelectedInListView(serverListView, serverList);
+            //deleteSelectedInListView(serverListView, serverList);
         }
     }
 
@@ -152,13 +249,19 @@ public class Controller implements Initializable {
             if (db.hasFiles()) {
                 //clientListView.setText("");
                 for (File file : db.getFiles()) {
-                    clientList.add(file.getName() + " ");
+                    try {
+                        Files.copy(file.toPath(), Paths.get("client/client_storage/" + file.getName()), StandardCopyOption.REPLACE_EXISTING);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                    }
+                    //clientList.add(file.getName() + " ");
                 }
                 success = true;
                 clientListView.setItems(clientList);
             }
             event.setDropCompleted(success);
             event.consume();
+            refreshClientsFilesList();
         });
     }
 

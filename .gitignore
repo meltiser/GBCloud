@@ -6,3 +6,5 @@
 *.log
 *.iml
 .idea/
+client/client_storage/*
+server/server_storage/*
