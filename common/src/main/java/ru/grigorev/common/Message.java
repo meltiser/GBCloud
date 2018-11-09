@@ -11,6 +11,7 @@ import java.util.List;
  */
 public class Message implements Serializable {
     private static final long serialVersionUID = 7420902541490628041L;
+    private String userName;
     private MessageType type;
     private byte[] byteArr;
     private String text;

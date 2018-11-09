@@ -8,3 +8,9 @@
 .idea/
 client/client_storage/*
 server/server_storage/*
+client/target/*
+common/target/*
+server/target/*
+client/client.iml
+common/common.iml
+server/server.iml

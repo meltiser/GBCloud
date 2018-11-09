@@ -1,14 +1,13 @@
 <?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<VBox fx:controller="ru.grigorev.client.Controller"
+<VBox fx:controller="ru.grigorev.client.MainController"
       xmlns:fx="http://javafx.com/fxml" alignment="center" stylesheets="styles.css">
-    <MenuBar fx:id="menuBar">
+    <MenuBar>
         <menus>
             <Menu text="Menu">
                 <items>
-                    <MenuItem fx:id="menuOpen" onAction="#openFile" text="Open"/>
-                    <MenuItem text="Save"/>
-                    <MenuItem text="Save As"/>
+                    <MenuItem text="Open" onAction="#openFile"/>
+                    <MenuItem text="Refresh All" onAction="#refreshAll"/>
                     <SeparatorMenuItem/>
                     <MenuItem text="Login" onAction="#openAuth"/>
                     <SeparatorMenuItem/>
@@ -18,7 +17,7 @@
             <Menu text="About">
                 <items>
                     <MenuItem text="Source Code" onAction="#openLink"/>
-                    <MenuItem text="Help" onAction="#showHelp"/>
+                    <MenuItem text="Help" onAction="#showHelp" disable="true"/>
                 </items>
             </Menu>
         </menus>
@@ -26,13 +25,11 @@
     <HBox VBox.vgrow="ALWAYS">
 
         <VBox HBox.hgrow="ALWAYS">
-            <ListView fx:id="clientListView" VBox.vgrow="ALWAYS" onMouseClicked="#clearSelection"/>
+            <ListView fx:id="clientListView" VBox.vgrow="ALWAYS"/>
             <HBox>
-                <Button fx:id="clientSendButton" text="Send file" onAction="#sendFile"
+                <Button text="Send file" onAction="#sendFile"
                         HBox.hgrow="ALWAYS"/>
-                <Button fx:id="clientRefreshButton" text="Refresh" onAction="#refreshList"
-                        HBox.hgrow="ALWAYS"/>
-                <Button fx:id="clientDeleteButton" text="Delete file" onAction="#deleteFile"
+                <Button text="Delete file" onAction="#deleteFileClient"
                         HBox.hgrow="ALWAYS"/>
             </HBox>
         </VBox>
@@ -40,11 +37,9 @@
         <VBox HBox.hgrow="ALWAYS">
             <ListView fx:id="serverListView" VBox.vgrow="ALWAYS"/>
             <HBox>
-                <Button fx:id="serverDownloadButton" text="Download file" onAction="#downloadFile"
+                <Button text="Download file" onAction="#downloadFile"
                         HBox.hgrow="ALWAYS"/>
-                <Button fx:id="serverRefreshButton" text="Refresh" onAction="#refreshServerFilesList"
-                        HBox.hgrow="ALWAYS"/>
-                <Button fx:id="serverDeleteButton" text="Delete file" onAction="#deleteFile"
+                <Button text="Delete file" onAction="#deleteFileServer"
                         HBox.hgrow="ALWAYS"/>
             </HBox>
         </VBox>

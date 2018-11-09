@@ -6,8 +6,10 @@ import io.netty.util.ReferenceCountUtil;
 import ru.grigorev.common.Message;
 import ru.grigorev.common.MessageType;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.stream.Collectors;
 
 /**
@@ -25,28 +27,37 @@ public class InHandler extends ChannelInboundHandlerAdapter {
             if (msg == null) {
                 return;
             }
-            Message myMessage = (Message) msg;
-            if (myMessage.getType().equals(MessageType.FILE_REQUEST)) {
-                if (Files.exists(Paths.get("server/server_storage/" + myMessage.getFileName()))) {
-                    Message fileMessage = new Message(MessageType.FILE, Paths.get("server/server_storage/" + myMessage.getFileName()));
+            Message message = (Message) msg;
+            if (message.getType().equals(MessageType.FILE_REQUEST)) {
+                if (Files.exists(Paths.get("server/server_storage/" + message.getFileName()))) {
+                    Message fileMessage = new Message(MessageType.FILE, Paths.get("server/server_storage/" + message.getFileName()));
                     ctx.writeAndFlush(fileMessage);
                 }
             }
-            if (myMessage.getType().equals(MessageType.REFRESH_REQUEST)) {
-                Message refreshMessage = new Message(MessageType.REFRESH_RESPONSE);
-                refreshMessage.setListFileNames(Files.list(Paths.get("server/server_storage"))
-                        .map(p -> p.getFileName().toString())
-                        .collect(Collectors.toList()));
-                ctx.writeAndFlush(refreshMessage);
+            if (message.getType().equals(MessageType.FILE)) {
+                Files.write(Paths.get("server/server_storage/" + message.getFileName()), message.getByteArr(), StandardOpenOption.CREATE);
+            }
+            if (message.getType().equals(MessageType.REFRESH_REQUEST)) {
+                ctx.writeAndFlush(getRefreshResponseMessage());
+            }
+            if (message.getType().equals(MessageType.DELETE_FILE)) {
+                try {
+                    Files.delete(Paths.get("server/server_storage/" + message.getFileName()));
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
             }
         } finally {
             ReferenceCountUtil.release(msg);
         }
     }
 
-    @Override
-    public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-        ctx.flush();
+    private Message getRefreshResponseMessage() throws IOException {
+        Message refreshMessage = new Message(MessageType.REFRESH_RESPONSE);
+        refreshMessage.setListFileNames(Files.list(Paths.get("server/server_storage"))
+                .map(p -> p.getFileName().toString())
+                .collect(Collectors.toList()));
+        return refreshMessage;
     }
 
     @Override

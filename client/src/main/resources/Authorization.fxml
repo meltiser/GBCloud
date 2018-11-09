@@ -6,7 +6,7 @@
 <?import javafx.scene.control.TextField?>
 <?import javafx.scene.layout.*?>
 <VBox fx:id="authScene" xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
-      fx:controller="ru.grigorev.client.Authorization"
+      fx:controller="ru.grigorev.client.AuthController"
       prefHeight="400.0" prefWidth="600.0" alignment="CENTER">
     <TextField fx:id="login" maxWidth="200" promptText="Login">
         <VBox.margin>
