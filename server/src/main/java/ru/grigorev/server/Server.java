@@ -11,6 +11,10 @@ import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.serialization.ClassResolvers;
 import io.netty.handler.codec.serialization.ObjectDecoder;
 import io.netty.handler.codec.serialization.ObjectEncoder;
+import ru.grigorev.common.Info;
+import ru.grigorev.server.db.dao.DAO;
+import ru.grigorev.server.db.service.DatabaseInteraction;
+import ru.grigorev.server.db.service.JdbcDatabaseInteraction;
 
 /**
  * @author Dmitriy Grigorev
@@ -18,6 +22,9 @@ import io.netty.handler.codec.serialization.ObjectEncoder;
 public class Server {
     private static final int PORT = 8189;
     private static final int MAX_OBJ_SIZE = 1024 * 1024 * 100; // 100 mb
+    private static DatabaseInteraction db;
+    private static DAO dao;
+    private static Server server;
 
     public void run() throws Exception {
         EventLoopGroup mainGroup = new NioEventLoopGroup();
@@ -32,7 +39,8 @@ public class Server {
                             socketChannel.pipeline().addLast( // web ----> server
                                     new ObjectDecoder(MAX_OBJ_SIZE, ClassResolvers.cacheDisabled(null)),
                                     new ObjectEncoder(),
-                                    new InHandler()
+                                    new AuthInHandler(dao),
+                                    new MainInHandler()
                             );
                         }
                     })
@@ -48,6 +56,11 @@ public class Server {
     }
 
     public static void main(String[] args) throws Exception {
-        new Server().run();
+        db = new JdbcDatabaseInteraction(Info.DB_URL, Info.DB_USER, Info.DB_PASSWORD);
+        db.initialize();
+        System.out.println("db has initialized");
+        dao = db.getDAO();
+        server = new Server();
+        server.run();
     }
 }

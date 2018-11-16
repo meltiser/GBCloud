@@ -1,7 +1,8 @@
-package ru.grigorev.client.logic;
+package ru.grigorev.client;
 
 import io.netty.handler.codec.serialization.ObjectDecoderInputStream;
 import io.netty.handler.codec.serialization.ObjectEncoderOutputStream;
+import ru.grigorev.common.AuthMessage;
 import ru.grigorev.common.Info;
 import ru.grigorev.common.Message;
 
@@ -45,14 +46,22 @@ public class Connection {
         }
     }
 
-    public static Message receiveMessage() {
-        Message message = null;
+    public static void sendAuthMessage(AuthMessage authMessage) {
         try {
-            message = (Message) in.readObject();
+            out.writeObject(authMessage);
+            out.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public static Object receiveMessage() {
+        Object received = null;
+        try {
+            received = in.readObject();
         } catch (ClassNotFoundException | IOException e) {
             e.printStackTrace();
         }
-        return message;
+        return received;
     }
-
 }

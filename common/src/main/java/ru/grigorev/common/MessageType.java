@@ -9,8 +9,10 @@ public enum MessageType {
     REFRESH_REQUEST,
     REFRESH_RESPONSE,
     DELETE_FILE,
+    GOODBYE,
     FILE_PART,
-    AUTH_REQUEST,
+    SIGN_IN_REQUEST,
+    SIGN_UP_REQUEST,
     AUTH_OK,
     AUTH_FAIL
 }

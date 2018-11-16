@@ -11,11 +11,10 @@ import java.util.List;
  */
 public class Message implements Serializable {
     private static final long serialVersionUID = 7420902541490628041L;
-    private String userName;
     private MessageType type;
-    private byte[] byteArr;
     private String text;
     private String fileName;
+    private byte[] byteArr;
 
     public List<String> getListFileNames() {
         return listFileNames;
@@ -26,15 +25,6 @@ public class Message implements Serializable {
     }
 
     private List<String> listFileNames;
-
-    public Message(String text) {
-        this.text = text;
-    }
-
-    public Message(MessageType type, byte[] byteArr) {
-        this.type = type;
-        this.byteArr = byteArr;
-    }
 
     public Message(MessageType type) {
         this.type = type;

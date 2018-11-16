@@ -5,6 +5,7 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ReferenceCountUtil;
 import ru.grigorev.common.Message;
 import ru.grigorev.common.MessageType;
+import ru.grigorev.server.db.model.User;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -15,10 +16,12 @@ import java.util.stream.Collectors;
 /**
  * @author Dmitriy Grigorev
  */
-public class InHandler extends ChannelInboundHandlerAdapter {
+public class MainInHandler extends ChannelInboundHandlerAdapter {
+    private User currentUser;
+
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        System.out.println("Client has connected!");
+        System.out.println("Client in main Handler");
     }
 
     @Override

@@ -5,27 +5,28 @@ import javafx.beans.binding.Bindings;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
 import javafx.scene.control.MenuItem;
+import javafx.scene.control.cell.TextFieldListCell;
 import javafx.scene.input.Dragboard;
 import javafx.scene.input.TransferMode;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-import ru.grigorev.client.logic.Connection;
+import ru.grigorev.common.AuthMessage;
 import ru.grigorev.common.Message;
 import ru.grigorev.common.MessageType;
 
-import java.awt.Desktop;
+import java.awt.*;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
-import java.nio.file.StandardOpenOption;
+import java.nio.file.*;
+import java.nio.file.attribute.FileTime;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
@@ -45,9 +46,11 @@ public class MainController implements Initializable {
         initContextMenu();
         initClientMainLoop();
         authController = new AuthController();
+        authController.setPrimaryStage(primaryStage);
         authController.init();
         //openAuth();
         refreshAll();
+        doubleClickRename();
     }
 
     public void initializeDragAndDropClientListView() {
@@ -86,8 +89,8 @@ public class MainController implements Initializable {
             editItem.textProperty().bind(Bindings.format("Rename \"%s\"", cell.itemProperty()));
             editItem.setOnAction(event -> {
                 //TODO:
-                /*clientListView.setEditable(true);
-                cell.startEdit(); // doesnt work!
+                clientListView.setEditable(true);
+                /*cell.startEdit(); // doesnt work!
                 clientListView.layout();
                 clientListView.edit(clientListView.getSelectionModel().getSelectedIndex()); // doesnt work too!
                 clientListView.setEditable(false);*/
@@ -96,12 +99,20 @@ public class MainController implements Initializable {
             deleteItem.textProperty().bind(Bindings.format("About", cell.itemProperty()));
             deleteItem.setOnAction(event -> {
                 long size = 0;
+                FileTime lastModified = null;
+                SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
                 try {
-                    size = Files.size(Paths.get("client/client_storage/" + cell.getItem()));
+                    Path gottenFile = (Paths.get("client/client_storage/" + cell.getItem()));
+                    size = Files.size(gottenFile);
+                    lastModified = Files.getLastModifiedTime(gottenFile);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-                new Alert(Alert.AlertType.INFORMATION, String.format("Size: %,d bytes", size), ButtonType.OK).show();
+                String context = String.format("Size: %,d bytes\nLast modified: %s", size, sdf.format(lastModified.toMillis()));
+                Alert alert = new Alert(Alert.AlertType.INFORMATION, context, ButtonType.OK);
+                alert.setTitle("About");
+                alert.setHeaderText(cell.getItem());
+                alert.show();
             });
             contextMenu.getItems().addAll(editItem, deleteItem);
 
@@ -117,28 +128,59 @@ public class MainController implements Initializable {
         });
     }
 
+    private void doubleClickRename() {
+        clientListView.setOnMouseClicked(click -> {
+            if (click.getClickCount() == 2) {
+                clientListView.setEditable(true);
+                clientListView.setCellFactory(TextFieldListCell.forListView());
+
+                clientListView.setOnEditCommit(new EventHandler<ListView.EditEvent<String>>() {
+                    @Override
+                    public void handle(ListView.EditEvent<String> t) {
+                        System.out.println(clientListView.getSelectionModel().getSelectedItem());
+                        clientListView.getItems().set(t.getIndex(), t.getNewValue());
+                        System.out.println(t.getNewValue());
+                    }
+                });
+
+                clientListView.setOnEditCancel(new EventHandler<ListView.EditEvent<String>>() {
+                    @Override
+                    public void handle(ListView.EditEvent<String> t) {
+                        System.out.println("setOnEditCancel");
+                    }
+                });
+            }
+        });
+    }
+
     private void initClientMainLoop() {
         Connection.init();
-        Thread t = new Thread(() -> {
+        Thread thread = new Thread(() -> {
             try {
                 while (true) {
-                    Message message = Connection.receiveMessage();
-                    if (message.getType().equals(MessageType.FILE)) {
-                        checkFileExisting(message);
-                        Files.write(Paths.get("client/client_storage/" + message.getFileName()), message.getByteArr(), StandardOpenOption.CREATE);
-                        refreshClientsFilesList();
+                    Object received = Connection.receiveMessage();
+                    if (received instanceof AuthMessage) {
+                        openAuth();
                     }
-                    if (message.getType().equals(MessageType.REFRESH_RESPONSE)) {
-                        if (Platform.isFxApplicationThread()) {
-                            serverList.clear();
-                            serverList.addAll(message.getListFileNames());
-                            serverListView.setItems(serverList);
-                        } else {
-                            Platform.runLater(() -> {
+                    if (received instanceof Message) {
+                        Message message = (Message) received;
+                        if (message.getType().equals(MessageType.FILE)) {
+                            checkFileExisting(message);
+                            Files.write(Paths.get("client/client_storage/" + message.getFileName()), message.getByteArr(), StandardOpenOption.CREATE);
+                            refreshClientsFilesList();
+                        }
+                        if (message.getType().equals(MessageType.REFRESH_RESPONSE)) {
+                            if (Platform.isFxApplicationThread()) {
                                 serverList.clear();
                                 serverList.addAll(message.getListFileNames());
                                 serverListView.setItems(serverList);
-                            });
+                            } else {
+                                Platform.runLater(() -> {
+                                    serverList.clear();
+                                    serverList.addAll(message.getListFileNames());
+                                    serverListView.setItems(serverList);
+                                });
+                            }
                         }
                     }
                 }
@@ -148,14 +190,14 @@ public class MainController implements Initializable {
                 Connection.close();
             }
         });
-        t.setDaemon(true);
-        t.start();
+        thread.setDaemon(true);
+        thread.start();
         clientListView.setItems(FXCollections.observableArrayList());
         refreshClientsFilesList();
     }
 
     public void openAuth() {
-        authController.getStage().showAndWait();
+        authController.getAuthStage().showAndWait();
     }
 
     public void refreshServerFilesList() {

@@ -19,11 +19,11 @@
         </VBox.margin>
     </PasswordField>
     <HBox alignment="CENTER">
-        <Button onAction="#auth" prefWidth="80" text="Sign In">
+        <Button onAction="#signIn" prefWidth="80" text="Sign In">
             <HBox.margin>
                 <Insets right="20.0"/>
             </HBox.margin>
         </Button>
-        <Button onAction="#auth" prefWidth="80" text="Sign Up"/>
+        <Button onAction="#signUp" prefWidth="80" text="Sign Up"/>
     </HBox>
 </VBox>
