@@ -3,24 +3,17 @@
 <VBox fx:controller="ru.grigorev.client.MainController"
       xmlns:fx="http://javafx.com/fxml" alignment="center" stylesheets="styles.css">
     <MenuBar>
-        <menus>
-            <Menu text="Menu">
-                <items>
-                    <MenuItem text="Open" onAction="#openFile"/>
-                    <MenuItem text="Refresh All" onAction="#refreshAll"/>
-                    <SeparatorMenuItem/>
-                    <MenuItem text="Login" onAction="#openAuth"/>
-                    <SeparatorMenuItem/>
-                    <MenuItem text="Exit" onAction="#exit"/>
-                </items>
-            </Menu>
-            <Menu text="About">
-                <items>
-                    <MenuItem text="Source Code" onAction="#openLink"/>
-                    <MenuItem text="Help" onAction="#showHelp" disable="true"/>
-                </items>
-            </Menu>
-        </menus>
+        <Menu text="Menu">
+            <MenuItem text="Open" onAction="#openFile"/>
+            <MenuItem text="Refresh All" onAction="#refreshAll"/>
+            <SeparatorMenuItem/>
+            <MenuItem text="Sign out" onAction="#signOut"/>
+            <SeparatorMenuItem/>
+            <MenuItem text="Exit" onAction="#exit"/>
+        </Menu>
+        <Menu text="About">
+            <MenuItem text="Source Code" onAction="#openLink"/>
+        </Menu>
     </MenuBar>
     <HBox VBox.vgrow="ALWAYS">
 

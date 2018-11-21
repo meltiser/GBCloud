@@ -20,7 +20,6 @@ import ru.grigorev.server.db.service.JdbcDatabaseInteraction;
  * @author Dmitriy Grigorev
  */
 public class Server {
-    private static final int PORT = 8189;
     private static final int MAX_OBJ_SIZE = 1024 * 1024 * 100; // 100 mb
     private static DatabaseInteraction db;
     private static DAO dao;
@@ -33,7 +32,7 @@ public class Server {
             ServerBootstrap b = new ServerBootstrap();
             b.group(mainGroup, workerGroup)
                     .channel(NioServerSocketChannel.class)
-                    // .handler(new LoggingHandler(LogLevel.INFO))
+//                    .handler(new LoggingHandler(LogLevel.INFO))
                     .childHandler(new ChannelInitializer<SocketChannel>() {
                         protected void initChannel(SocketChannel socketChannel) throws Exception {
                             socketChannel.pipeline().addLast( // web ----> server
@@ -45,9 +44,9 @@ public class Server {
                         }
                     })
                     .option(ChannelOption.SO_BACKLOG, 128)
-                    .option(ChannelOption.TCP_NODELAY, true)
+                    .childOption(ChannelOption.TCP_NODELAY, true)
                     .childOption(ChannelOption.SO_KEEPALIVE, true);
-            ChannelFuture future = b.bind(PORT).sync();
+            ChannelFuture future = b.bind(Info.PORT).sync();
             future.channel().closeFuture().sync();
         } finally {
             mainGroup.shutdownGracefully();
@@ -61,6 +60,7 @@ public class Server {
         System.out.println("db has initialized");
         dao = db.getDAO();
         server = new Server();
+        System.out.println("server is starting...");
         server.run();
     }
 }

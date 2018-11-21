@@ -3,12 +3,14 @@ package ru.grigorev.server;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.util.ReferenceCountUtil;
-import ru.grigorev.common.Message;
-import ru.grigorev.common.MessageType;
-import ru.grigorev.server.db.model.User;
+import ru.grigorev.common.Info;
+import ru.grigorev.common.message.Message;
+import ru.grigorev.common.message.MessageType;
+import ru.grigorev.common.utils.BigFileHandler;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.stream.Collectors;
@@ -17,38 +19,48 @@ import java.util.stream.Collectors;
  * @author Dmitriy Grigorev
  */
 public class MainInHandler extends ChannelInboundHandlerAdapter {
-    private User currentUser;
-
-    @Override
-    public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        System.out.println("Client in main Handler");
-    }
+    private String login;
+    private BigFileHandler bigFileHandler;
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         try {
-            if (msg == null) {
-                return;
-            }
+            if (msg == null) return;
+            if (bigFileHandler == null) bigFileHandler = new BigFileHandler();
             Message message = (Message) msg;
+            login = message.getLogin() + "/";
+            Path file = Paths.get(Info.SERVER_FOLDER_NAME + login + message.getFileName());
+            if (!bigFileHandler.checkFolderExisting(Info.SERVER_FOLDER_NAME + login))
+                ctx.writeAndFlush(getRefreshResponseMessage());
+
             if (message.getType().equals(MessageType.FILE_REQUEST)) {
-                if (Files.exists(Paths.get("server/server_storage/" + message.getFileName()))) {
-                    Message fileMessage = new Message(MessageType.FILE, Paths.get("server/server_storage/" + message.getFileName()));
-                    ctx.writeAndFlush(fileMessage);
+                System.out.println(MessageType.FILE_REQUEST);
+
+                if (Files.exists(file)) {
+                    if (Files.size(file) <= Info.MAX_FILE_SIZE) sendSmallFile(ctx, file);
+                    else bigFileHandler.sendBigFile(ctx, file);
                 }
             }
             if (message.getType().equals(MessageType.FILE)) {
-                Files.write(Paths.get("server/server_storage/" + message.getFileName()), message.getByteArr(), StandardOpenOption.CREATE);
+                System.out.println(MessageType.FILE);
+
+                Files.write(file, message.getByteArr(), StandardOpenOption.CREATE);
+            }
+            if (message.getType().equals(MessageType.FILE_PART)) {
+                System.out.println(MessageType.FILE_PART + " : " + message.getCurrentPart() + "/" + message.getPartsCount());
+
+                if (!bigFileHandler.isWriting()) bigFileHandler.startWriting(file);
+                bigFileHandler.continueWriting(message);
             }
             if (message.getType().equals(MessageType.REFRESH_REQUEST)) {
+                System.out.println(MessageType.REFRESH_RESPONSE);
+
                 ctx.writeAndFlush(getRefreshResponseMessage());
             }
             if (message.getType().equals(MessageType.DELETE_FILE)) {
-                try {
-                    Files.delete(Paths.get("server/server_storage/" + message.getFileName()));
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+                System.out.println(MessageType.DELETE_FILE);
+
+                Files.delete(file);
             }
         } finally {
             ReferenceCountUtil.release(msg);
@@ -57,7 +69,7 @@ public class MainInHandler extends ChannelInboundHandlerAdapter {
 
     private Message getRefreshResponseMessage() throws IOException {
         Message refreshMessage = new Message(MessageType.REFRESH_RESPONSE);
-        refreshMessage.setListFileNames(Files.list(Paths.get("server/server_storage"))
+        refreshMessage.setListFileNames(Files.list(Paths.get(Info.SERVER_FOLDER_NAME + login))
                 .map(p -> p.getFileName().toString())
                 .collect(Collectors.toList()));
         return refreshMessage;
@@ -67,5 +79,10 @@ public class MainInHandler extends ChannelInboundHandlerAdapter {
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         cause.printStackTrace();
         ctx.close();
+    }
+
+    private void sendSmallFile(ChannelHandlerContext ctx, Path path) throws IOException {
+        Message fileMessage = new Message(MessageType.FILE, path);
+        ctx.writeAndFlush(fileMessage);
     }
 }

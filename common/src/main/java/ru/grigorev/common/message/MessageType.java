@@ -1,4 +1,4 @@
-package ru.grigorev.common;
+package ru.grigorev.common.message;
 
 /**
  * @author Dmitriy Grigorev
@@ -9,10 +9,12 @@ public enum MessageType {
     REFRESH_REQUEST,
     REFRESH_RESPONSE,
     DELETE_FILE,
-    GOODBYE,
     FILE_PART,
     SIGN_IN_REQUEST,
     SIGN_UP_REQUEST,
+    SIGN_OUT_REQUEST,
+    SIGN_OUT_RESPONSE,
+    DISCONNECTING,
     AUTH_OK,
     AUTH_FAIL
 }

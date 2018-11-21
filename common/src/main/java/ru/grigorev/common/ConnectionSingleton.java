@@ -1,10 +1,9 @@
-package ru.grigorev.client;
+package ru.grigorev.common;
 
 import io.netty.handler.codec.serialization.ObjectDecoderInputStream;
 import io.netty.handler.codec.serialization.ObjectEncoderOutputStream;
-import ru.grigorev.common.AuthMessage;
-import ru.grigorev.common.Info;
-import ru.grigorev.common.Message;
+import ru.grigorev.common.message.AuthMessage;
+import ru.grigorev.common.message.Message;
 
 import java.io.IOException;
 import java.net.Socket;
@@ -12,22 +11,31 @@ import java.net.Socket;
 /**
  * @author Dmitriy Grigorev
  */
-public class Connection {
-    private static ObjectEncoderOutputStream out;
-    private static ObjectDecoderInputStream in;
-    private static Socket socket;
+public class ConnectionSingleton {
+    private ObjectEncoderOutputStream out;
+    private ObjectDecoderInputStream in;
+    private Socket socket;
 
-    public static void init() {
+    private static ConnectionSingleton ourInstance = new ConnectionSingleton();
+
+    private ConnectionSingleton() {
+    }
+
+    public static ConnectionSingleton getInstance() {
+        return ourInstance;
+    }
+
+    public void init() {
         try {
             socket = new Socket(Info.HOST, Info.PORT);
-            in = new ObjectDecoderInputStream(socket.getInputStream());
+            in = new ObjectDecoderInputStream(socket.getInputStream(), 1024 * 1024 * 100);
             out = new ObjectEncoderOutputStream(socket.getOutputStream());
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    public static void close() {
+    public void close() {
         try {
             socket.close();
             in.close();
@@ -37,7 +45,7 @@ public class Connection {
         }
     }
 
-    public static void sendMessage(Message message) {
+    public void sendMessage(Message message) {
         try {
             out.writeObject(message);
             out.flush();
@@ -46,7 +54,7 @@ public class Connection {
         }
     }
 
-    public static void sendAuthMessage(AuthMessage authMessage) {
+    public void sendAuthMessage(AuthMessage authMessage) {
         try {
             out.writeObject(authMessage);
             out.flush();
@@ -55,7 +63,7 @@ public class Connection {
         }
     }
 
-    public static Object receiveMessage() {
+    public Object receiveMessage() {
         Object received = null;
         try {
             received = in.readObject();

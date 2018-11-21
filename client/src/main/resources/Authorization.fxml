@@ -1,13 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
 <?import javafx.geometry.Insets?>
-<?import javafx.scene.control.Button?>
-<?import javafx.scene.control.PasswordField?>
-<?import javafx.scene.control.TextField?>
+<?import javafx.scene.control.*?>
 <?import javafx.scene.layout.*?>
-<VBox fx:id="authScene" xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
+<VBox fx:id="authVBox" xmlns="http://javafx.com/javafx" xmlns:fx="http://javafx.com/fxml"
       fx:controller="ru.grigorev.client.AuthController"
       prefHeight="400.0" prefWidth="600.0" alignment="CENTER">
+    <Label fx:id="label" maxWidth="200" text="Please sign in or sign up!" alignment="CENTER">
+        <VBox.margin>
+            <Insets bottom="10.0"/>
+        </VBox.margin>
+    </Label>
     <TextField fx:id="login" maxWidth="200" promptText="Login">
         <VBox.margin>
             <Insets bottom="10.0"/>
@@ -19,7 +22,7 @@
         </VBox.margin>
     </PasswordField>
     <HBox alignment="CENTER">
-        <Button onAction="#signIn" prefWidth="80" text="Sign In">
+        <Button onAction="#signIn" prefWidth="80" text="Sign In" defaultButton="true">
             <HBox.margin>
                 <Insets right="20.0"/>
             </HBox.margin>

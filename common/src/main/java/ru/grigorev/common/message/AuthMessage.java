@@ -1,4 +1,4 @@
-package ru.grigorev.common;
+package ru.grigorev.common.message;
 
 import java.io.Serializable;
 
@@ -6,6 +6,7 @@ import java.io.Serializable;
  * @author Dmitriy Grigorev
  */
 public class AuthMessage implements Serializable {
+    private static final long serialVersionUID = 2861725369189287101L;
     private MessageType type;
     private String login;
     private String password;
@@ -21,6 +22,10 @@ public class AuthMessage implements Serializable {
         this.type = type;
         this.login = login;
         this.password = password;
+    }
+
+    public AuthMessage(MessageType type) {
+        this.type = type;
     }
 
     public String getLogin() {

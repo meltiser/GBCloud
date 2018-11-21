@@ -6,8 +6,8 @@
 *.log
 *.iml
 .idea/
-client/client_storage/*
-server/server_storage/*
+client_storage/*
+server_storage/*
 client/target/*
 common/target/*
 server/target/*

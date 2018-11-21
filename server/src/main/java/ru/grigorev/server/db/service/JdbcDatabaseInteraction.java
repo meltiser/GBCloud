@@ -62,9 +62,9 @@ public class JdbcDatabaseInteraction implements DatabaseInteraction {
 
     public void insertExampleUsers() throws SQLException {
         Statement statement = connection.createStatement();
-        statement.execute("INSERT INTO \"UsersSchema\".\"Users\" (login, password) VALUES ('Tom', 'tom');");
-        statement.execute("INSERT INTO \"UsersSchema\".\"Users\" (login, password) VALUES ('Bob', 'bob');");
-        statement.execute("INSERT INTO \"UsersSchema\".\"Users\" (login, password) VALUES ('Nick', 'nick');");
+        statement.execute("INSERT INTO \"UsersSchema\".\"Users\" (login, password) VALUES ('tom', 'tom');");
+        statement.execute("INSERT INTO \"UsersSchema\".\"Users\" (login, password) VALUES ('bob', 'bob');");
+        statement.execute("INSERT INTO \"UsersSchema\".\"Users\" (login, password) VALUES ('nick', 'nick');");
         statement.close();
     }
 

@@ -1,22 +1,21 @@
 package ru.grigorev.client;
 
 import javafx.application.Platform;
-import javafx.beans.binding.Bindings;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
-import javafx.event.EventHandler;
 import javafx.fxml.Initializable;
-import javafx.scene.control.*;
-import javafx.scene.control.MenuItem;
-import javafx.scene.control.cell.TextFieldListCell;
-import javafx.scene.input.Dragboard;
-import javafx.scene.input.TransferMode;
+import javafx.scene.Scene;
+import javafx.scene.control.Label;
+import javafx.scene.control.ListView;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
-import ru.grigorev.common.AuthMessage;
-import ru.grigorev.common.Message;
-import ru.grigorev.common.MessageType;
+import ru.grigorev.common.ConnectionSingleton;
+import ru.grigorev.common.Info;
+import ru.grigorev.common.message.AuthMessage;
+import ru.grigorev.common.message.Message;
+import ru.grigorev.common.message.MessageType;
+import ru.grigorev.common.utils.BigFileHandler;
 
 import java.awt.*;
 import java.io.File;
@@ -25,8 +24,6 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.*;
-import java.nio.file.attribute.FileTime;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
@@ -36,158 +33,60 @@ public class MainController implements Initializable {
     public ListView<String> clientListView;
 
     private AuthController authController;
+    private Scene authScene;
     private Stage primaryStage;
     private ObservableList<String> clientList = FXCollections.observableList(new ArrayList<>());
     private ObservableList<String> serverList = FXCollections.observableList(new ArrayList<>());
+    private BigFileHandler bigFileHandler;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        initializeDragAndDropClientListView();
-        initContextMenu();
-        initClientMainLoop();
-        authController = new AuthController();
-        authController.setPrimaryStage(primaryStage);
-        authController.init();
-        //openAuth();
+        bigFileHandler = new BigFileHandler();
+        GUIhelper.initDragAndDropClientListView(clientListView, clientList);
+        GUIhelper.initContextMenu(clientListView);
         refreshAll();
-        doubleClickRename();
+        bigFileHandler.checkFolderExisting(Info.CLIENT_FOLDER_NAME);
+        GUIhelper.runWatchServiceThread();
     }
 
-    public void initializeDragAndDropClientListView() {
-        clientListView.setOnDragOver(event -> {
-            if (event.getGestureSource() != clientListView && event.getDragboard().hasFiles()) {
-                event.acceptTransferModes(TransferMode.COPY_OR_MOVE);
-            }
-            event.consume();
-        });
-
-        clientListView.setOnDragDropped(event -> {
-            Dragboard db = event.getDragboard();
-            boolean success = false;
-            if (db.hasFiles()) {
-                for (File file : db.getFiles()) {
-                    try {
-                        Files.copy(file.toPath(), Paths.get("client/client_storage/" + file.getName()), StandardCopyOption.REPLACE_EXISTING);
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-                success = true;
-                clientListView.setItems(clientList);
-                refreshClientsFilesList();
-            }
-            event.setDropCompleted(success);
-            event.consume();
-        });
-    }
-
-    private void initContextMenu() {
-        clientListView.setCellFactory(lv -> {
-            ListCell<String> cell = new ListCell<>();
-            ContextMenu contextMenu = new ContextMenu();
-            MenuItem editItem = new MenuItem();
-            editItem.textProperty().bind(Bindings.format("Rename \"%s\"", cell.itemProperty()));
-            editItem.setOnAction(event -> {
-                //TODO:
-                clientListView.setEditable(true);
-                /*cell.startEdit(); // doesnt work!
-                clientListView.layout();
-                clientListView.edit(clientListView.getSelectionModel().getSelectedIndex()); // doesnt work too!
-                clientListView.setEditable(false);*/
-            });
-            MenuItem deleteItem = new MenuItem();
-            deleteItem.textProperty().bind(Bindings.format("About", cell.itemProperty()));
-            deleteItem.setOnAction(event -> {
-                long size = 0;
-                FileTime lastModified = null;
-                SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
-                try {
-                    Path gottenFile = (Paths.get("client/client_storage/" + cell.getItem()));
-                    size = Files.size(gottenFile);
-                    lastModified = Files.getLastModifiedTime(gottenFile);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                String context = String.format("Size: %,d bytes\nLast modified: %s", size, sdf.format(lastModified.toMillis()));
-                Alert alert = new Alert(Alert.AlertType.INFORMATION, context, ButtonType.OK);
-                alert.setTitle("About");
-                alert.setHeaderText(cell.getItem());
-                alert.show();
-            });
-            contextMenu.getItems().addAll(editItem, deleteItem);
-
-            cell.textProperty().bind(cell.itemProperty());
-            cell.emptyProperty().addListener((obs, wasEmpty, isNowEmpty) -> {
-                if (isNowEmpty) {
-                    cell.setContextMenu(null);
-                } else {
-                    cell.setContextMenu(contextMenu);
-                }
-            });
-            return cell;
-        });
-    }
-
-    private void doubleClickRename() {
-        clientListView.setOnMouseClicked(click -> {
-            if (click.getClickCount() == 2) {
-                clientListView.setEditable(true);
-                clientListView.setCellFactory(TextFieldListCell.forListView());
-
-                clientListView.setOnEditCommit(new EventHandler<ListView.EditEvent<String>>() {
-                    @Override
-                    public void handle(ListView.EditEvent<String> t) {
-                        System.out.println(clientListView.getSelectionModel().getSelectedItem());
-                        clientListView.getItems().set(t.getIndex(), t.getNewValue());
-                        System.out.println(t.getNewValue());
-                    }
-                });
-
-                clientListView.setOnEditCancel(new EventHandler<ListView.EditEvent<String>>() {
-                    @Override
-                    public void handle(ListView.EditEvent<String> t) {
-                        System.out.println("setOnEditCancel");
-                    }
-                });
-            }
-        });
-    }
-
-    private void initClientMainLoop() {
-        Connection.init();
+    public void initClientMainLoop() {
         Thread thread = new Thread(() -> {
+            System.out.println("Initing main loop");
             try {
                 while (true) {
-                    Object received = Connection.receiveMessage();
+                    Object received = ConnectionSingleton.getInstance().receiveMessage();
                     if (received instanceof AuthMessage) {
-                        openAuth();
+                        AuthMessage authMessage = (AuthMessage) received;
+                        if (authMessage.getType().equals(MessageType.SIGN_OUT_RESPONSE)) {
+                            System.out.println("Breaking main loop");
+                            break;
+                        }
+                        if (authMessage.getType().equals(MessageType.DISCONNECTING)) {
+                            System.out.println("Closing connection...");
+                            Platform.exit();
+                            ConnectionSingleton.getInstance().close();
+                            break;
+                        }
                     }
                     if (received instanceof Message) {
                         Message message = (Message) received;
                         if (message.getType().equals(MessageType.FILE)) {
-                            checkFileExisting(message);
-                            Files.write(Paths.get("client/client_storage/" + message.getFileName()), message.getByteArr(), StandardOpenOption.CREATE);
+                            Files.write(Paths.get(Info.CLIENT_FOLDER_NAME + message.getFileName()),
+                                    message.getByteArr(), StandardOpenOption.CREATE);
                             refreshClientsFilesList();
                         }
                         if (message.getType().equals(MessageType.REFRESH_RESPONSE)) {
-                            if (Platform.isFxApplicationThread()) {
-                                serverList.clear();
-                                serverList.addAll(message.getListFileNames());
-                                serverListView.setItems(serverList);
-                            } else {
-                                Platform.runLater(() -> {
-                                    serverList.clear();
-                                    serverList.addAll(message.getListFileNames());
-                                    serverListView.setItems(serverList);
-                                });
-                            }
+                            refreshServerFilesList(message);
+                        }
+                        if (message.getType().equals(MessageType.FILE_PART)) {
+                            Path path = Paths.get(Info.CLIENT_FOLDER_NAME + message.getFileName());
+                            if (!bigFileHandler.isWriting()) bigFileHandler.startWriting(path);
+                            bigFileHandler.continueWriting(message);
                         }
                     }
                 }
             } catch (IOException e) {
                 e.printStackTrace();
-            } finally {
-                Connection.close();
             }
         });
         thread.setDaemon(true);
@@ -196,61 +95,54 @@ public class MainController implements Initializable {
         refreshClientsFilesList();
     }
 
-    public void openAuth() {
-        authController.getAuthStage().showAndWait();
+    public void signOut() {
+        ConnectionSingleton.getInstance().sendAuthMessage(new AuthMessage(MessageType.SIGN_OUT_REQUEST));
+        primaryStage.close();
+        authController.setAuthorized(false);
+        authController.getPrimaryStage().setScene(authController.getAuthScene());
+        authController.initAuthLoop();
+        authController.getPrimaryStage().show();
     }
 
-    public void refreshServerFilesList() {
-        Connection.sendMessage(new Message(MessageType.REFRESH_REQUEST));
+    private void sendServerRefreshFileListMessage() {
+        ConnectionSingleton.getInstance().sendMessage(new Message(MessageType.REFRESH_REQUEST));
+    }
+
+    private void refreshServerFilesList(Message message) {
+        Platform.runLater(() -> {
+            serverList.clear();
+            serverList.addAll(message.getListFileNames());
+            serverListView.setItems(serverList);
+            if (serverListView.getItems().isEmpty())
+                serverListView.setPlaceholder(new Label("The storage is empty!"));
+        });
     }
 
     public void refreshClientsFilesList() {
-        if (Platform.isFxApplicationThread()) {
+        Platform.runLater(() -> {
             try {
                 clientListView.getItems().clear();
-                Files.list(Paths.get("client/client_storage"))
+                Files.list(Paths.get(Info.CLIENT_FOLDER_NAME))
                         .map(p -> p.getFileName().toString())
                         .forEach(o -> clientListView.getItems().add(o));
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        } else {
-            Platform.runLater(() -> {
-                try {
-                    clientListView.getItems().clear();
-                    Files.list(Paths.get("client/client_storage"))
-                            .map(p -> p.getFileName().toString())
-                            .forEach(o -> clientListView.getItems().add(o));
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            });
-        }
+            if (clientListView.getItems().isEmpty())
+                clientListView.setPlaceholder(new Label("Open or drop files here!"));
+        });
     }
 
     public void refreshAll() {
         refreshClientsFilesList();
-        refreshServerFilesList();
-    }
-
-    private void checkFileExisting(Message message) {
-        if (Files.exists(Paths.get("client/client_storage/" + message.getFileName()))) {
-            if (Platform.isFxApplicationThread()) {
-                Alert alert = new Alert(Alert.AlertType.INFORMATION, "File is already exists!", ButtonType.OK);
-                alert.show();
-            } else {
-                Platform.runLater(() -> {
-                    Alert alert = new Alert(Alert.AlertType.INFORMATION, "File is already exists!", ButtonType.OK);
-                    alert.show();
-                });
-            }
-        }
+        sendServerRefreshFileListMessage();
     }
 
     public void downloadFile(ActionEvent actionEvent) {
         String selectedItem = getSelectedAndClearSelection(serverListView);
         if (selectedItem == null) return;
-        Connection.sendMessage(new Message(MessageType.FILE_REQUEST, selectedItem));
+        if (!isFileExisting(selectedItem, clientListView))
+            ConnectionSingleton.getInstance().sendMessage(new Message(MessageType.FILE_REQUEST, selectedItem));
     }
 
     private String getSelectedAndClearSelection(ListView<String> listView) {
@@ -259,28 +151,37 @@ public class MainController implements Initializable {
         return selectedItem;
     }
 
-    public void setPrimaryStage(Stage primaryStage) {
-        this.primaryStage = primaryStage;
-    }
-
     public void sendFile(ActionEvent actionEvent) {
         String selectedItem = getSelectedAndClearSelection(clientListView);
         if (selectedItem == null) {
             return;
         }
-        if (Files.exists(Paths.get("client/client_storage/" + selectedItem))) {
+        if (Files.exists(Paths.get(Info.CLIENT_FOLDER_NAME + selectedItem))) {
             try {
-                Message fileMessage = new Message(MessageType.FILE, Paths.get("client/client_storage/" + selectedItem));
-                Connection.sendMessage(fileMessage);
+                Path file = Paths.get(Info.CLIENT_FOLDER_NAME + selectedItem);
+                if (!isFileExisting(file.getFileName().toString(), serverListView)) {
+                    if (Files.size(file) <= Info.MAX_FILE_SIZE) {
+                        System.out.println("file is less than max allowed size");
+                        ConnectionSingleton.getInstance().sendMessage(new Message(MessageType.FILE, file));
+                    } else {
+                        System.out.println("sending big file");
+                        bigFileHandler.sendBigFile(ConnectionSingleton.getInstance(), file);
+                    }
+                }
             } catch (IOException e) {
                 e.printStackTrace();
             }
         }
-        refreshServerFilesList();
+        sendServerRefreshFileListMessage();
     }
 
-    public void showHelp(ActionEvent actionEvent) {
-        //TODO
+    private boolean isFileExisting(String fileName, ListView<String> listView) {
+        if (listView.getItems().contains(fileName)) {
+            Platform.runLater(() -> GUIhelper.showAlert(
+                    "File is already exists!", "Cannot send or download file", "Warning!"));
+            return true;
+        } else
+            return false;
     }
 
     public void openFile(ActionEvent actionEvent) {
@@ -290,7 +191,9 @@ public class MainController implements Initializable {
         if (list != null) {
             for (File file : list) {
                 try {
-                    Files.copy(file.toPath(), Paths.get("client/client_storage/" + file.getName()), StandardCopyOption.REPLACE_EXISTING);
+                    Files.copy(file.toPath(),
+                            Paths.get(Info.CLIENT_FOLDER_NAME + file.getName()),
+                            StandardCopyOption.REPLACE_EXISTING);
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -303,7 +206,7 @@ public class MainController implements Initializable {
         String selectedItem = getSelectedAndClearSelection(clientListView);
         if (selectedItem == null) return;
         try {
-            Files.delete(Paths.get("client/client_storage/" + selectedItem));
+            Files.delete(Paths.get(Info.CLIENT_FOLDER_NAME + selectedItem));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -311,7 +214,7 @@ public class MainController implements Initializable {
     }
 
     public void exit(ActionEvent actionEvent) {
-        Platform.exit();
+        ConnectionSingleton.getInstance().sendAuthMessage(new AuthMessage(MessageType.DISCONNECTING));
     }
 
     public void openLink(ActionEvent actionEvent) {
@@ -326,7 +229,19 @@ public class MainController implements Initializable {
     public void deleteFileServer(ActionEvent actionEvent) {
         String selectedItem = getSelectedAndClearSelection(serverListView);
         if (selectedItem == null) return;
-        Connection.sendMessage(new Message(MessageType.DELETE_FILE, selectedItem));
-        refreshServerFilesList();
+        ConnectionSingleton.getInstance().sendMessage(new Message(MessageType.DELETE_FILE, selectedItem));
+        sendServerRefreshFileListMessage();
+    }
+
+    public void setAuthController(AuthController authController) {
+        this.authController = authController;
+    }
+
+    public void setAuthScene(Scene authScene) {
+        this.authScene = authScene;
+    }
+
+    public void setPrimaryStage(Stage primaryStage) {
+        this.primaryStage = primaryStage;
     }
 }
