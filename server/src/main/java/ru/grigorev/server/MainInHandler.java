@@ -6,7 +6,7 @@ import io.netty.util.ReferenceCountUtil;
 import ru.grigorev.common.Info;
 import ru.grigorev.common.message.Message;
 import ru.grigorev.common.message.MessageType;
-import ru.grigorev.common.utils.BigFileHandler;
+import ru.grigorev.common.utils.FileHandler;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -20,26 +20,23 @@ import java.util.stream.Collectors;
  */
 public class MainInHandler extends ChannelInboundHandlerAdapter {
     private String login;
-    private BigFileHandler bigFileHandler;
+    private FileHandler fileHandler;
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
         try {
             if (msg == null) return;
-            if (bigFileHandler == null) bigFileHandler = new BigFileHandler();
+            if (fileHandler == null) fileHandler = new FileHandler();
             Message message = (Message) msg;
             login = message.getLogin() + "/";
             Path file = Paths.get(Info.SERVER_FOLDER_NAME + login + message.getFileName());
-            if (!bigFileHandler.checkFolderExisting(Info.SERVER_FOLDER_NAME + login))
+            if (!fileHandler.checkFolderExisting(Info.SERVER_FOLDER_NAME + login))
                 ctx.writeAndFlush(getRefreshResponseMessage());
 
             if (message.getType().equals(MessageType.FILE_REQUEST)) {
                 System.out.println(MessageType.FILE_REQUEST);
 
-                if (Files.exists(file)) {
-                    if (Files.size(file) <= Info.MAX_FILE_SIZE) sendSmallFile(ctx, file);
-                    else bigFileHandler.sendBigFile(ctx, file);
-                }
+                fileHandler.sendFile(ctx, file);
             }
             if (message.getType().equals(MessageType.FILE)) {
                 System.out.println(MessageType.FILE);
@@ -49,13 +46,24 @@ public class MainInHandler extends ChannelInboundHandlerAdapter {
             if (message.getType().equals(MessageType.FILE_PART)) {
                 System.out.println(MessageType.FILE_PART + " : " + message.getCurrentPart() + "/" + message.getPartsCount());
 
-                if (!bigFileHandler.isWriting()) bigFileHandler.startWriting(file);
-                bigFileHandler.continueWriting(message);
+                if (!fileHandler.isWriting()) fileHandler.startWriting(file);
+                fileHandler.continueWriting(message);
             }
             if (message.getType().equals(MessageType.REFRESH_REQUEST)) {
                 System.out.println(MessageType.REFRESH_RESPONSE);
 
-                ctx.writeAndFlush(getRefreshResponseMessage());
+                ctx.writeAndFlush(getRefreshResponseMessage()); // это работает штатно
+            }
+            if (message.getType().equals(MessageType.ABOUT_FILE)) {
+                System.out.println(MessageType.ABOUT_FILE); // в этот блок заходим
+
+                Message aboutFileMessage = new Message(MessageType.ABOUT_FILE);
+                aboutFileMessage.setFileName(file.getFileName().toString());
+                aboutFileMessage.setLastModified(Files.getLastModifiedTime(file));
+                aboutFileMessage.setFileSize(Files.size(file));
+                System.out.println("before sending"); // это отображается
+                ctx.writeAndFlush(aboutFileMessage); // проблема здесь???
+                System.out.println("after sending"); // это тоже отображется
             }
             if (message.getType().equals(MessageType.DELETE_FILE)) {
                 System.out.println(MessageType.DELETE_FILE);
@@ -79,10 +87,5 @@ public class MainInHandler extends ChannelInboundHandlerAdapter {
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
         cause.printStackTrace();
         ctx.close();
-    }
-
-    private void sendSmallFile(ChannelHandlerContext ctx, Path path) throws IOException {
-        Message fileMessage = new Message(MessageType.FILE, path);
-        ctx.writeAndFlush(fileMessage);
     }
 }

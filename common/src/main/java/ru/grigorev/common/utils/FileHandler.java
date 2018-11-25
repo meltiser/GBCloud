@@ -16,18 +16,20 @@ import java.util.Arrays;
 
 /**
  * @author Dmitriy Grigorev
+ * works only with ConnectionSingleton or ChannelHandlerContext classes
  */
-public class BigFileHandler {
-    private int partsCount;
-    private int currentPart;
-    private byte[] byteArr;
+public class FileHandler {
     private FileOutputStream fos;
     private boolean isWriting;
+    private Object out;
+
+    public FileHandler() {
+    }
 
     public void continueWriting(Message message) throws IOException {
-        byteArr = message.getByteArr();
-        currentPart = message.getCurrentPart();
-        partsCount = message.getPartsCount();
+        byte[] byteArr = message.getByteArr();
+        int currentPart = message.getCurrentPart();
+        int partsCount = message.getPartsCount();
         fos.write(byteArr);
         fos.flush();
 
@@ -49,6 +51,25 @@ public class BigFileHandler {
         isWriting = true;
     }
 
+    public boolean sendFile(Object out, Path file) throws IOException {
+        if (Files.exists(file) && !Files.isDirectory(file)) {
+            if (Files.size(file) <= Info.MAX_FILE_SIZE) {
+                System.out.println("file is less than max allowed size");
+                sendSmallFile(out, file);
+            } else {
+                System.out.println("sending big file");
+                sendBigFile(out, file);
+            }
+            return true;
+        } else
+            return false;
+    }
+
+    private void sendSmallFile(Object out, Path file) throws IOException {
+        Message message = new Message(MessageType.FILE, file);
+        sendMessageDependingOnInstance(out,message);
+    }
+
     public void sendBigFile(Object out, Path path) throws IOException {
         long fileSize = Files.size(path);
         int partsCount = (int) (fileSize / Info.MAX_FILE_SIZE);
@@ -61,22 +82,26 @@ public class BigFileHandler {
         byte[] buf = new byte[BUFFER_SIZE];
 
         int read = 0;
-        int currentPart = 1;
+        int currentPartSending = 1;
         while ((read = is.read(buf)) > 0) {
-            System.out.println("bufsize: " + read + " current part: " + currentPart);
+            System.out.println("bufsize: " + read + " current part: " + currentPartSending);
             Message message;
             if (read < BUFFER_SIZE) {
                 byte[] bytesLeft = Arrays.copyOfRange(buf, 0, read);
-                message = new Message(MessageType.FILE_PART, bytesLeft, partsCount, currentPart, path.getFileName().toString());
+                message = new Message(MessageType.FILE_PART, bytesLeft, partsCount, currentPartSending, path.getFileName().toString());
             } else {
-                message = new Message(MessageType.FILE_PART, buf, partsCount, currentPart, path.getFileName().toString());
+                message = new Message(MessageType.FILE_PART, buf, partsCount, currentPartSending, path.getFileName().toString());
             }
-            if (out instanceof ChannelHandlerContext) ((ChannelHandlerContext) out).writeAndFlush(message);
-            if (out instanceof ConnectionSingleton) ((ConnectionSingleton) out).sendMessage(message);
-            currentPart++;
+            sendMessageDependingOnInstance(out, message);
+            currentPartSending++;
         }
         is.close();
         is = null;
+    }
+
+    private void sendMessageDependingOnInstance(Object out, Message message) {
+        if (out instanceof ChannelHandlerContext) ((ChannelHandlerContext) out).writeAndFlush(message);
+        if (out instanceof ConnectionSingleton) ((ConnectionSingleton) out).sendMessage(message);
     }
 
     /**

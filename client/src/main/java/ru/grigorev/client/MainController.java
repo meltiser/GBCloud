@@ -15,7 +15,7 @@ import ru.grigorev.common.Info;
 import ru.grigorev.common.message.AuthMessage;
 import ru.grigorev.common.message.Message;
 import ru.grigorev.common.message.MessageType;
-import ru.grigorev.common.utils.BigFileHandler;
+import ru.grigorev.common.utils.FileHandler;
 
 import java.awt.*;
 import java.io.File;
@@ -27,6 +27,7 @@ import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ResourceBundle;
+import java.util.concurrent.*;
 
 public class MainController implements Initializable {
     public ListView<String> serverListView;
@@ -37,15 +38,24 @@ public class MainController implements Initializable {
     private Stage primaryStage;
     private ObservableList<String> clientList = FXCollections.observableList(new ArrayList<>());
     private ObservableList<String> serverList = FXCollections.observableList(new ArrayList<>());
-    private BigFileHandler bigFileHandler;
+    private FileHandler fileHandler;
+
+    private BlockingQueue<Runnable> taskQueue;
+    private ExecutorService singleThreadExecutor;
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        bigFileHandler = new BigFileHandler();
+        taskQueue = new LinkedBlockingQueue<>();
+        singleThreadExecutor = new ThreadPoolExecutor(1, 1, 0L,
+                TimeUnit.MILLISECONDS, taskQueue);
+        fileHandler = new FileHandler();
         GUIhelper.initDragAndDropClientListView(clientListView, clientList);
-        GUIhelper.initContextMenu(clientListView);
+        GUIhelper.initClientContextMenu(clientListView);
+        GUIhelper.initServerContextMenu(serverListView);
+        GUIhelper.initListViewIcons(clientListView);
+        GUIhelper.initListViewIcons(serverListView);
         refreshAll();
-        bigFileHandler.checkFolderExisting(Info.CLIENT_FOLDER_NAME);
+        fileHandler.checkFolderExisting(Info.CLIENT_FOLDER_NAME);
         GUIhelper.runWatchServiceThread();
     }
 
@@ -54,6 +64,7 @@ public class MainController implements Initializable {
             System.out.println("Initing main loop");
             try {
                 while (true) {
+                    System.out.println("message received"); // это не показывается, значит сообщение теряется?
                     Object received = ConnectionSingleton.getInstance().receiveMessage();
                     if (received instanceof AuthMessage) {
                         AuthMessage authMessage = (AuthMessage) received;
@@ -70,6 +81,13 @@ public class MainController implements Initializable {
                     }
                     if (received instanceof Message) {
                         Message message = (Message) received;
+                        if (message.getType().equals(MessageType.ABOUT_FILE)) {
+                            System.out.println("Received?"); // должно зайти сюда...
+                            String context = String.format("Size: %s\nLast modified: %s",
+                                    GUIhelper.getFormattedSize(message.getFileSize()),
+                                    GUIhelper.getFormattedLastModified(message.getLastModified()));
+                            GUIhelper.showAlert(context, message.getFileName(), "About");
+                        }
                         if (message.getType().equals(MessageType.FILE)) {
                             Files.write(Paths.get(Info.CLIENT_FOLDER_NAME + message.getFileName()),
                                     message.getByteArr(), StandardOpenOption.CREATE);
@@ -80,8 +98,8 @@ public class MainController implements Initializable {
                         }
                         if (message.getType().equals(MessageType.FILE_PART)) {
                             Path path = Paths.get(Info.CLIENT_FOLDER_NAME + message.getFileName());
-                            if (!bigFileHandler.isWriting()) bigFileHandler.startWriting(path);
-                            bigFileHandler.continueWriting(message);
+                            if (!fileHandler.isWriting()) fileHandler.startWriting(path);
+                            fileHandler.continueWriting(message);
                         }
                     }
                 }
@@ -151,28 +169,23 @@ public class MainController implements Initializable {
         return selectedItem;
     }
 
-    public void sendFile(ActionEvent actionEvent) {
+    public void sendFile(ActionEvent actionEvent) throws InterruptedException {
         String selectedItem = getSelectedAndClearSelection(clientListView);
         if (selectedItem == null) {
             return;
         }
-        if (Files.exists(Paths.get(Info.CLIENT_FOLDER_NAME + selectedItem))) {
-            try {
-                Path file = Paths.get(Info.CLIENT_FOLDER_NAME + selectedItem);
-                if (!isFileExisting(file.getFileName().toString(), serverListView)) {
-                    if (Files.size(file) <= Info.MAX_FILE_SIZE) {
-                        System.out.println("file is less than max allowed size");
-                        ConnectionSingleton.getInstance().sendMessage(new Message(MessageType.FILE, file));
-                    } else {
-                        System.out.println("sending big file");
-                        bigFileHandler.sendBigFile(ConnectionSingleton.getInstance(), file);
-                    }
+        Path file = Paths.get(Info.CLIENT_FOLDER_NAME + selectedItem);
+        if (!isFileExisting(file.getFileName().toString(), serverListView)) {
+            taskQueue.put(() -> {
+                try {
+                    fileHandler.sendFile(ConnectionSingleton.getInstance(), file);
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+                sendServerRefreshFileListMessage();
+            });
+            singleThreadExecutor.submit(taskQueue.poll());
         }
-        sendServerRefreshFileListMessage();
     }
 
     private boolean isFileExisting(String fileName, ListView<String> listView) {
@@ -213,7 +226,8 @@ public class MainController implements Initializable {
         refreshClientsFilesList();
     }
 
-    public void exit(ActionEvent actionEvent) {
+    public void exit() {
+        singleThreadExecutor.shutdown();
         ConnectionSingleton.getInstance().sendAuthMessage(new AuthMessage(MessageType.DISCONNECTING));
     }
 

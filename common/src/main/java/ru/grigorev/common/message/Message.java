@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileTime;
 import java.util.List;
 
 /**
@@ -18,10 +19,11 @@ public class Message implements Serializable {
     private String login;
     private int partsCount;
     private List<String> listFileNames;
+    private long fileSize;
+    private FileTime lastModified;
 
     public Message(MessageType type) {
         this.type = type;
-        this.byteArr = null;
     }
 
     public Message(MessageType type, byte[] byteArr, int partsCount, int currentPart, String fileName) {
@@ -93,5 +95,25 @@ public class Message implements Serializable {
 
     public void setCurrentPart(int currentPart) {
         this.currentPart = currentPart;
+    }
+
+    public long getFileSize() {
+        return fileSize;
+    }
+
+    public void setFileSize(long fileSize) {
+        this.fileSize = fileSize;
+    }
+
+    public FileTime getLastModified() {
+        return lastModified;
+    }
+
+    public void setLastModified(FileTime lastModified) {
+        this.lastModified = lastModified;
+    }
+
+    public void setFileName(String fileName) {
+        this.fileName = fileName;
     }
 }

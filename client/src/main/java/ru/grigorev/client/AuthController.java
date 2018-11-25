@@ -108,7 +108,7 @@ public class AuthController implements Initializable {
             primaryStage.setScene(mainScene);
             primaryStage.getIcons().add(new Image("/icon.png"));
             primaryStage.setOnCloseRequest((c) -> {
-                ConnectionSingleton.getInstance().sendAuthMessage(new AuthMessage(MessageType.DISCONNECTING));
+                mainController.exit();
             });
             GUIhelper.setMainController(mainController);
             primaryStage.show();
