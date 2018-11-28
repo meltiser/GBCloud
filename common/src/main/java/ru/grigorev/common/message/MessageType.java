@@ -6,6 +6,7 @@ package ru.grigorev.common.message;
 public enum MessageType {
     FILE,
     ABOUT_FILE,
+    FIlE_RENAME,
     FILE_REQUEST,
     REFRESH_REQUEST,
     REFRESH_RESPONSE,

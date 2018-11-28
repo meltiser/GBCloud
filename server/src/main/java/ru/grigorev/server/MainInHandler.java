@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.nio.file.attribute.FileTime;
 import java.util.stream.Collectors;
 
 /**
@@ -52,23 +53,27 @@ public class MainInHandler extends ChannelInboundHandlerAdapter {
             if (message.getType().equals(MessageType.REFRESH_REQUEST)) {
                 System.out.println(MessageType.REFRESH_RESPONSE);
 
-                ctx.writeAndFlush(getRefreshResponseMessage()); // это работает штатно
+                ctx.writeAndFlush(getRefreshResponseMessage());
             }
             if (message.getType().equals(MessageType.ABOUT_FILE)) {
-                System.out.println(MessageType.ABOUT_FILE); // в этот блок заходим
+                System.out.println(MessageType.ABOUT_FILE);
 
                 Message aboutFileMessage = new Message(MessageType.ABOUT_FILE);
                 aboutFileMessage.setFileName(file.getFileName().toString());
-                aboutFileMessage.setLastModified(Files.getLastModifiedTime(file));
+                aboutFileMessage.setLastModified(Files.getLastModifiedTime(file).toMillis());
                 aboutFileMessage.setFileSize(Files.size(file));
-                System.out.println("before sending"); // это отображается
-                ctx.writeAndFlush(aboutFileMessage); // проблема здесь???
-                System.out.println("after sending"); // это тоже отображется
+                ctx.writeAndFlush(aboutFileMessage);
             }
             if (message.getType().equals(MessageType.DELETE_FILE)) {
                 System.out.println(MessageType.DELETE_FILE);
 
                 Files.delete(file);
+            }
+            if (message.getType().equals(MessageType.FIlE_RENAME)) {
+                System.out.println(MessageType.FIlE_RENAME);
+
+                Files.move(file, Paths.get(Info.SERVER_FOLDER_NAME + login + message.getRename()));
+                ctx.writeAndFlush(getRefreshResponseMessage());
             }
         } finally {
             ReferenceCountUtil.release(msg);

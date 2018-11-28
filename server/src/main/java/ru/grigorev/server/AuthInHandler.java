@@ -10,6 +10,7 @@ import ru.grigorev.server.db.dao.DAO;
 import ru.grigorev.server.db.model.User;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * @author Dmitriy Grigorev

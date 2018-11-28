@@ -1,6 +1,5 @@
 package ru.grigorev.client;
 
-import javafx.application.Platform;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.scene.control.*;
@@ -21,6 +20,7 @@ import java.nio.file.*;
 import java.nio.file.attribute.FileTime;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
+import java.util.Optional;
 
 /**
  * @author Dmitriy Grigorev
@@ -29,15 +29,8 @@ public class GUIhelper {
     private static AuthController authController;
     private static MainController mainController;
 
-    public static void showFXThreadSafeAlert(String info, String header, String title) {
-        if (Platform.isFxApplicationThread()) {
-            showAlert(info, header, title);
-        }
-        Platform.runLater(() -> showAlert(info, header, title));
-    }
-
-    public static void showAlert(String info, String header, String title) {
-        Alert alert = new Alert(Alert.AlertType.INFORMATION, info);
+    public static void showAlert(String info, String header, String title, Alert.AlertType type) {
+        Alert alert = new Alert(type, info);
         alert.setHeaderText(header);
         alert.setTitle(title);
 
@@ -54,11 +47,7 @@ public class GUIhelper {
         MenuItem aboutItem = new MenuItem("About");
         aboutItem.setOnAction(event -> {
             String selected = clientListView.getSelectionModel().getSelectedItem();
-            if (selected == null) {
-                //TODO
-                System.out.println("returning");
-                return;
-            }
+            if (selected == null) return;
             long size = 0;
             FileTime lastModified = null;
             try {
@@ -70,11 +59,41 @@ public class GUIhelper {
             }
             String context = String.format("Size: %s\nLast modified: %s",
                     GUIhelper.getFormattedSize(size),
-                    GUIhelper.getFormattedLastModified(lastModified));
-            GUIhelper.showAlert(context, selected, "About");
+                    GUIhelper.getFormattedLastModified(lastModified.toMillis()));
+            GUIhelper.showAlert(context, selected, "About", Alert.AlertType.INFORMATION);
         });
-        contextMenu.getItems().addAll(aboutItem);
+        MenuItem renameItem = new MenuItem("Rename");
+        renameItem.setOnAction(event -> {
+            String selected = clientListView.getSelectionModel().getSelectedItem();
+            if (selected == null) return;
+            Path gottenFile = Paths.get(Info.CLIENT_FOLDER_NAME + selected);
+            String renamed = showRenameDialog(selected);
+            if (renamed.equals("") || renamed.equals(selected)) {
+                return;
+            } else {
+                try {
+                    Files.move(gottenFile, Paths.get(Info.CLIENT_FOLDER_NAME + renamed));
+                } catch (IOException e) {
+                    GUIhelper.showAlert("File is already exists!", null, "Warning!",
+                            Alert.AlertType.WARNING);
+                }
+            }
+        });
+        contextMenu.getItems().addAll(aboutItem, renameItem);
         clientListView.setContextMenu(contextMenu);
+    }
+
+    public static String showRenameDialog(String file) {
+        TextInputDialog dialog = new TextInputDialog(file);
+        dialog.setTitle("Renaming...");
+        dialog.setHeaderText(null);
+        dialog.setContentText("Enter new file name: ");
+
+        Stage stage = (Stage) dialog.getDialogPane().getScene().getWindow();
+        stage.getIcons().add(new Image("/icon.png"));
+
+        Optional<String> result = dialog.showAndWait();
+        return result.orElse("");
     }
 
     public static void initServerContextMenu(ListView<String> serverListView) {
@@ -84,9 +103,22 @@ public class GUIhelper {
         MenuItem aboutItem = new MenuItem("About");
         aboutItem.setOnAction(event -> {
             String selected = serverListView.getSelectionModel().getSelectedItem();
-            ConnectionSingleton.getInstance().sendMessage(new Message(MessageType.ABOUT_FILE, selected)); // тут отправка
+            if (selected == null) return;
+            ConnectionSingleton.getInstance().sendMessage(new Message(MessageType.ABOUT_FILE, selected));
         });
-        contextMenu.getItems().addAll(aboutItem);
+        MenuItem renameItem = new MenuItem("Rename");
+        renameItem.setOnAction(event -> {
+            String selected = serverListView.getSelectionModel().getSelectedItem();
+            if (selected == null) return;
+            String renamed = showRenameDialog(selected);
+            if (renamed.equals("") || renamed.equals(selected) || mainController.isFileExisting(renamed, serverListView)) {
+                return;
+            }
+            Message renameMessage = new Message(MessageType.FIlE_RENAME, selected);
+            renameMessage.setRename(renamed);
+            ConnectionSingleton.getInstance().sendMessage(renameMessage);
+        });
+        contextMenu.getItems().addAll(aboutItem, renameItem);
         serverListView.setContextMenu(contextMenu);
     }
 
@@ -98,12 +130,11 @@ public class GUIhelper {
         String[] units = new String[]{"B", "KB", "MB", "GB", "TB"};
         int digitGroups = (int) (Math.log10(size) / Math.log10(1024));
         return new DecimalFormat("#,##0.#").format(size / Math.pow(1024, digitGroups)) + " " + units[digitGroups];
-        /*return String.format("%,d", size);*/
     }
 
-    public static String getFormattedLastModified(FileTime lastModified) {
+    public static String getFormattedLastModified(long lastModified) {
         SimpleDateFormat sdf = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
-        return sdf.format(lastModified.toMillis());
+        return sdf.format(lastModified);
     }
 
     public static void initDragAndDropClientListView(ListView<String> listView, ObservableList<String> list) {
@@ -198,7 +229,6 @@ public class GUIhelper {
             }
         });
     }
-
 
     public static void setAuthController(AuthController authController) {
         GUIhelper.authController = authController;

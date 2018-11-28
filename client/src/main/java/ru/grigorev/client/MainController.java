@@ -6,8 +6,10 @@ import javafx.collections.ObservableList;
 import javafx.event.ActionEvent;
 import javafx.fxml.Initializable;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Label;
 import javafx.scene.control.ListView;
+import javafx.scene.input.MouseEvent;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import ru.grigorev.common.ConnectionSingleton;
@@ -32,6 +34,7 @@ import java.util.concurrent.*;
 public class MainController implements Initializable {
     public ListView<String> serverListView;
     public ListView<String> clientListView;
+    public Label mainLabel;
 
     private AuthController authController;
     private Scene authScene;
@@ -54,9 +57,9 @@ public class MainController implements Initializable {
         GUIhelper.initServerContextMenu(serverListView);
         GUIhelper.initListViewIcons(clientListView);
         GUIhelper.initListViewIcons(serverListView);
-        refreshAll();
         fileHandler.checkFolderExisting(Info.CLIENT_FOLDER_NAME);
         GUIhelper.runWatchServiceThread();
+        refreshAll();
     }
 
     public void initClientMainLoop() {
@@ -64,7 +67,7 @@ public class MainController implements Initializable {
             System.out.println("Initing main loop");
             try {
                 while (true) {
-                    System.out.println("message received"); // это не показывается, значит сообщение теряется?
+                    System.out.println("Message received");
                     Object received = ConnectionSingleton.getInstance().receiveMessage();
                     if (received instanceof AuthMessage) {
                         AuthMessage authMessage = (AuthMessage) received;
@@ -82,11 +85,12 @@ public class MainController implements Initializable {
                     if (received instanceof Message) {
                         Message message = (Message) received;
                         if (message.getType().equals(MessageType.ABOUT_FILE)) {
-                            System.out.println("Received?"); // должно зайти сюда...
                             String context = String.format("Size: %s\nLast modified: %s",
                                     GUIhelper.getFormattedSize(message.getFileSize()),
                                     GUIhelper.getFormattedLastModified(message.getLastModified()));
-                            GUIhelper.showAlert(context, message.getFileName(), "About");
+                            Platform.runLater(() ->
+                                    GUIhelper.showAlert(context, message.getFileName(), "About",
+                                            Alert.AlertType.INFORMATION));
                         }
                         if (message.getType().equals(MessageType.FILE)) {
                             Files.write(Paths.get(Info.CLIENT_FOLDER_NAME + message.getFileName()),
@@ -97,9 +101,12 @@ public class MainController implements Initializable {
                             refreshServerFilesList(message);
                         }
                         if (message.getType().equals(MessageType.FILE_PART)) {
+                            Platform.runLater(() -> mainLabel.setText("Wait until " + message.getFileName() + "is ready..."));
                             Path path = Paths.get(Info.CLIENT_FOLDER_NAME + message.getFileName());
                             if (!fileHandler.isWriting()) fileHandler.startWriting(path);
                             fileHandler.continueWriting(message);
+                            if (message.getCurrentPart() == message.getPartsCount())
+                                Platform.runLater(() -> mainLabel.setText(message.getFileName() + " downloaded!"));
                         }
                     }
                 }
@@ -175,10 +182,14 @@ public class MainController implements Initializable {
             return;
         }
         Path file = Paths.get(Info.CLIENT_FOLDER_NAME + selectedItem);
+        if (Files.isDirectory(file)) return; //can't send directories now
         if (!isFileExisting(file.getFileName().toString(), serverListView)) {
             taskQueue.put(() -> {
                 try {
+                    Platform.runLater(() -> mainLabel.setText("Sending " + selectedItem + "..."));
                     fileHandler.sendFile(ConnectionSingleton.getInstance(), file);
+                    sendServerRefreshFileListMessage();
+                    Platform.runLater(() -> mainLabel.setText(selectedItem + " uploaded!"));
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -188,10 +199,10 @@ public class MainController implements Initializable {
         }
     }
 
-    private boolean isFileExisting(String fileName, ListView<String> listView) {
+    public boolean isFileExisting(String fileName, ListView<String> listView) {
         if (listView.getItems().contains(fileName)) {
             Platform.runLater(() -> GUIhelper.showAlert(
-                    "File is already exists!", "Cannot send or download file", "Warning!"));
+                    "File is already exists!", null, "Warning!", Alert.AlertType.WARNING));
             return true;
         } else
             return false;
@@ -220,10 +231,28 @@ public class MainController implements Initializable {
         if (selectedItem == null) return;
         try {
             Files.delete(Paths.get(Info.CLIENT_FOLDER_NAME + selectedItem));
+        } catch (DirectoryNotEmptyException e) {
+            GUIhelper.showAlert("The folder is not empty!", "Warning!", "Cannot delete folder",
+                    Alert.AlertType.WARNING);
         } catch (IOException e) {
             e.printStackTrace();
         }
         refreshClientsFilesList();
+    }
+
+    public void openFileInDesktop(MouseEvent mouseEvent) {
+        if (mouseEvent.getClickCount() == 2) {
+            String selected = clientListView.getSelectionModel().getSelectedItem();
+            if (selected == null) return;
+            Path file = Paths.get(Info.CLIENT_FOLDER_NAME + selected);
+            if (!Files.isDirectory(file)) {
+                try {
+                    Desktop.getDesktop().open(file.toFile());
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
     }
 
     public void exit() {
@@ -232,9 +261,8 @@ public class MainController implements Initializable {
     }
 
     public void openLink(ActionEvent actionEvent) {
-        Desktop desktop = Desktop.getDesktop();
         try {
-            desktop.browse(new URI("https://github.com/meltiser/GBCloud"));
+            Desktop.getDesktop().browse(new URI("https://github.com/meltiser/GBCloud"));
         } catch (IOException | URISyntaxException e) {
             e.printStackTrace();
         }

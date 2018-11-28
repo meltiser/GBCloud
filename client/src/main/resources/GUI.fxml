@@ -15,10 +15,10 @@
             <MenuItem text="Source Code" onAction="#openLink"/>
         </Menu>
     </MenuBar>
+    <Label fx:id="mainLabel" alignment="CENTER"/>
     <HBox VBox.vgrow="ALWAYS">
-
         <VBox HBox.hgrow="ALWAYS">
-            <ListView fx:id="clientListView" VBox.vgrow="ALWAYS"/>
+            <ListView fx:id="clientListView" VBox.vgrow="ALWAYS" onMouseClicked="#openFileInDesktop"/>
             <HBox>
                 <Button text="Send file" onAction="#sendFile"
                         HBox.hgrow="ALWAYS"/>

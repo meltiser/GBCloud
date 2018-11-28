@@ -20,7 +20,8 @@ public class Message implements Serializable {
     private int partsCount;
     private List<String> listFileNames;
     private long fileSize;
-    private FileTime lastModified;
+    private long lastModified;
+    private String rename;
 
     public Message(MessageType type) {
         this.type = type;
@@ -105,15 +106,23 @@ public class Message implements Serializable {
         this.fileSize = fileSize;
     }
 
-    public FileTime getLastModified() {
+    public long getLastModified() {
         return lastModified;
     }
 
-    public void setLastModified(FileTime lastModified) {
+    public void setLastModified(long lastModified) {
         this.lastModified = lastModified;
     }
 
     public void setFileName(String fileName) {
         this.fileName = fileName;
+    }
+
+    public String getRename() {
+        return rename;
+    }
+
+    public void setRename(String rename) {
+        this.rename = rename;
     }
 }

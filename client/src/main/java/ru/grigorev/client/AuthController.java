@@ -6,6 +6,7 @@ import javafx.fxml.FXMLLoader;
 import javafx.fxml.Initializable;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import javafx.scene.control.Alert;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
@@ -59,7 +60,8 @@ public class AuthController implements Initializable {
                             GUIhelper.showAlert(
                                     authMessage.getMessage(),
                                     "Welcome, " + login.getText() + "!",
-                                    "Authorization success");
+                                    "Authorization success",
+                                    Alert.AlertType.INFORMATION);
                             authVBox.getScene().getWindow().hide();
                             isAuthorized = true;
                             initMainWindow();
