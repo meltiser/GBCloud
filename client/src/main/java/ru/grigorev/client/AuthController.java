@@ -36,7 +36,6 @@ public class AuthController implements Initializable {
 
     @Override
     public void initialize(URL location, ResourceBundle resources) {
-        System.out.println("initialize block");
         ConnectionSingleton.getInstance().init();
         initAuthLoop();
     }
@@ -82,14 +81,14 @@ public class AuthController implements Initializable {
         thread.start();
     }
 
-    public void signIn(ActionEvent actionEvent) {
+    public void signIn() {
         Platform.runLater(() -> {
             System.out.println(String.format("signing in - login: %s, Pass: %s", login.getText(), password.getText()));
             ConnectionSingleton.getInstance().sendAuthMessage(new AuthMessage(MessageType.SIGN_IN_REQUEST, login.getText(), password.getText()));
         });
     }
 
-    public void signUp(ActionEvent actionEvent) {
+    public void signUp() {
         Platform.runLater(() -> {
             System.out.println(String.format("signing up - Login: %s, Pass: %s", login.getText(), password.getText()));
             ConnectionSingleton.getInstance().sendAuthMessage(new AuthMessage(MessageType.SIGN_UP_REQUEST, login.getText(), password.getText()));

@@ -21,7 +21,6 @@ import java.util.Arrays;
 public class FileHandler {
     private FileOutputStream fos;
     private boolean isWriting;
-    private Object out;
 
     public FileHandler() {
     }

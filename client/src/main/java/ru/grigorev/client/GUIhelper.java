@@ -1,5 +1,6 @@
 package ru.grigorev.client;
 
+import javafx.application.Platform;
 import javafx.collections.ObservableList;
 import javafx.concurrent.Task;
 import javafx.scene.control.*;
@@ -51,7 +52,7 @@ public class GUIhelper {
             long size = 0;
             FileTime lastModified = null;
             try {
-                Path gottenFile = Paths.get(Info.CLIENT_FOLDER_NAME + selected);
+                Path gottenFile = Paths.get(mainController.getCurrentClientDir() + selected);
                 size = Files.size(gottenFile);
                 lastModified = Files.getLastModifiedTime(gottenFile);
             } catch (IOException e) {
@@ -66,28 +67,46 @@ public class GUIhelper {
         renameItem.setOnAction(event -> {
             String selected = clientListView.getSelectionModel().getSelectedItem();
             if (selected == null) return;
-            Path gottenFile = Paths.get(Info.CLIENT_FOLDER_NAME + selected);
-            String renamed = showRenameDialog(selected);
+            Path gottenFile = Paths.get(mainController.getCurrentClientDir() + selected);
+            String renamed = showInputDialog(selected, "Renaming...", "Enter new file name: ");
             if (renamed.equals("") || renamed.equals(selected)) {
                 return;
             } else {
                 try {
-                    Files.move(gottenFile, Paths.get(Info.CLIENT_FOLDER_NAME + renamed));
+                    Files.move(gottenFile, Paths.get(mainController.getCurrentClientDir() + renamed));
+                    mainController.refreshClientsFilesList();
                 } catch (IOException e) {
                     GUIhelper.showAlert("File is already exists!", null, "Warning!",
                             Alert.AlertType.WARNING);
                 }
             }
         });
-        contextMenu.getItems().addAll(aboutItem, renameItem);
+        MenuItem createFolder = new MenuItem("Create folder");
+        createFolder.setOnAction(event -> {
+            String folderName = showInputDialog("New folder",
+                    "New folder",
+                    "Enter folder name: ");
+            if (folderName.equals("")) {
+                return;
+            } else {
+                try {
+                    Files.createDirectory(Paths.get(mainController.getCurrentClientDir() + folderName));
+                    mainController.refreshClientsFilesList();
+                } catch (IOException e) {
+                    GUIhelper.showAlert("Folder is already exists!", null, "Warning!",
+                            Alert.AlertType.WARNING);
+                }
+            }
+        });
+        contextMenu.getItems().addAll(aboutItem, renameItem, createFolder);
         clientListView.setContextMenu(contextMenu);
     }
 
-    public static String showRenameDialog(String file) {
-        TextInputDialog dialog = new TextInputDialog(file);
-        dialog.setTitle("Renaming...");
+    public static String showInputDialog(String promptText, String title, String contentText) {
+        TextInputDialog dialog = new TextInputDialog(promptText);
+        dialog.setTitle(title);
         dialog.setHeaderText(null);
-        dialog.setContentText("Enter new file name: ");
+        dialog.setContentText(contentText);
 
         Stage stage = (Stage) dialog.getDialogPane().getScene().getWindow();
         stage.getIcons().add(new Image("/icon.png"));
@@ -110,7 +129,7 @@ public class GUIhelper {
         renameItem.setOnAction(event -> {
             String selected = serverListView.getSelectionModel().getSelectedItem();
             if (selected == null) return;
-            String renamed = showRenameDialog(selected);
+            String renamed = showInputDialog(selected, "Renaming...", "Enter new file name: ");
             if (renamed.equals("") || renamed.equals(selected) || mainController.isFileExisting(renamed, serverListView)) {
                 return;
             }
@@ -151,7 +170,7 @@ public class GUIhelper {
             if (db.hasFiles()) {
                 for (File file : db.getFiles()) {
                     try {
-                        Files.copy(file.toPath(), Paths.get(Info.CLIENT_FOLDER_NAME + file.getName()),
+                        Files.copy(file.toPath(), Paths.get(mainController.getCurrentClientDir() + file.getName()),
                                 StandardCopyOption.REPLACE_EXISTING);
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -159,7 +178,6 @@ public class GUIhelper {
                 }
                 success = true;
                 listView.setItems(list);
-                mainController.refreshClientsFilesList();
             }
             event.setDropCompleted(success);
             event.consume();
@@ -207,26 +225,30 @@ public class GUIhelper {
         final Image FILE = new Image("/file.png");
         final Image FOLDER = new Image("/folder.png");
 
-        listView.setCellFactory(param -> new ListCell<>() {
-            ImageView imageView = new ImageView();
+        Platform.runLater(() -> {
+            listView.setCellFactory(param -> new ListCell<>() {
+                ImageView imageView = new ImageView();
 
-            @Override
-            public void updateItem(String name, boolean empty) {
-                super.updateItem(name, empty);
-                if (empty) {
-                    setText(null);
-                    setGraphic(null);
-                } else {
-                    if (Files.isDirectory(Paths.get(Info.CLIENT_FOLDER_NAME + name))) {
-                        imageView.setImage(FOLDER);
-                    } else
-                        imageView.setImage(FILE);
-                    imageView.fitHeightProperty().set(17.0);
-                    imageView.fitWidthProperty().set(14.0);
-                    setText(name);
-                    setGraphic(imageView);
+                @Override
+                public void updateItem(String name, boolean empty) {
+                    super.updateItem(name, empty);
+                    if (empty) {
+                        setText(null);
+                        setGraphic(null);
+                    } else {
+                        if (Files.isDirectory(Paths.get(mainController.getCurrentClientDir() + name)))
+                            imageView.setImage(FOLDER);
+                        else
+                            imageView.setImage(FILE);
+                        imageView.fitHeightProperty().set(17.0);
+                        imageView.fitWidthProperty().set(14.0);
+                        setText(name);
+                        setGraphic(imageView);
+                        if (name.equals(".."))
+                            setGraphic(null);
+                    }
                 }
-            }
+            });
         });
     }
 

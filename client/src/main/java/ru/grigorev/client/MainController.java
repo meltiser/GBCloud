@@ -42,6 +42,7 @@ public class MainController implements Initializable {
     private ObservableList<String> clientList = FXCollections.observableList(new ArrayList<>());
     private ObservableList<String> serverList = FXCollections.observableList(new ArrayList<>());
     private FileHandler fileHandler;
+    private String currentClientDir;
 
     private BlockingQueue<Runnable> taskQueue;
     private ExecutorService singleThreadExecutor;
@@ -52,12 +53,13 @@ public class MainController implements Initializable {
         singleThreadExecutor = new ThreadPoolExecutor(1, 1, 0L,
                 TimeUnit.MILLISECONDS, taskQueue);
         fileHandler = new FileHandler();
+        fileHandler.checkFolderExisting(Info.CLIENT_FOLDER_NAME);
+        currentClientDir = Info.CLIENT_FOLDER_NAME;
         GUIhelper.initDragAndDropClientListView(clientListView, clientList);
         GUIhelper.initClientContextMenu(clientListView);
         GUIhelper.initServerContextMenu(serverListView);
         GUIhelper.initListViewIcons(clientListView);
         GUIhelper.initListViewIcons(serverListView);
-        fileHandler.checkFolderExisting(Info.CLIENT_FOLDER_NAME);
         GUIhelper.runWatchServiceThread();
         refreshAll();
     }
@@ -67,7 +69,6 @@ public class MainController implements Initializable {
             System.out.println("Initing main loop");
             try {
                 while (true) {
-                    System.out.println("Message received");
                     Object received = ConnectionSingleton.getInstance().receiveMessage();
                     if (received instanceof AuthMessage) {
                         AuthMessage authMessage = (AuthMessage) received;
@@ -93,16 +94,20 @@ public class MainController implements Initializable {
                                             Alert.AlertType.INFORMATION));
                         }
                         if (message.getType().equals(MessageType.FILE)) {
-                            Files.write(Paths.get(Info.CLIENT_FOLDER_NAME + message.getFileName()),
+                            System.out.println(MessageType.FILE);
+
+                            Files.write(Paths.get(currentClientDir + message.getFileName()),
                                     message.getByteArr(), StandardOpenOption.CREATE);
                             refreshClientsFilesList();
+                            Platform.runLater(() -> mainLabel.setText(message.getFileName() + " downloaded!"));
                         }
                         if (message.getType().equals(MessageType.REFRESH_RESPONSE)) {
+                            System.out.println(MessageType.REFRESH_RESPONSE);
+
                             refreshServerFilesList(message);
                         }
                         if (message.getType().equals(MessageType.FILE_PART)) {
-                            Platform.runLater(() -> mainLabel.setText("Wait until " + message.getFileName() + "is ready..."));
-                            Path path = Paths.get(Info.CLIENT_FOLDER_NAME + message.getFileName());
+                            Path path = Paths.get(currentClientDir + message.getFileName());
                             if (!fileHandler.isWriting()) fileHandler.startWriting(path);
                             fileHandler.continueWriting(message);
                             if (message.getCurrentPart() == message.getPartsCount())
@@ -147,14 +152,22 @@ public class MainController implements Initializable {
         Platform.runLater(() -> {
             try {
                 clientListView.getItems().clear();
-                Files.list(Paths.get(Info.CLIENT_FOLDER_NAME))
+                if (!isClientRootFolder()) {
+                    clientListView.getItems().add("..");
+                }
+                Files.list(Paths.get(currentClientDir))
+                        .filter((f) -> Files.isDirectory(f))
+                        .map(p -> p.getFileName().toString())
+                        .forEach(o -> clientListView.getItems().add(o));
+                Files.list(Paths.get(currentClientDir))
+                        .filter((f) -> !Files.isDirectory(f))
                         .map(p -> p.getFileName().toString())
                         .forEach(o -> clientListView.getItems().add(o));
             } catch (IOException e) {
                 e.printStackTrace();
             }
             if (clientListView.getItems().isEmpty())
-                clientListView.setPlaceholder(new Label("Open or drop files here!"));
+                clientListView.setPlaceholder(new Label("Folder is empty!"));
         });
     }
 
@@ -166,8 +179,10 @@ public class MainController implements Initializable {
     public void downloadFile(ActionEvent actionEvent) {
         String selectedItem = getSelectedAndClearSelection(serverListView);
         if (selectedItem == null) return;
-        if (!isFileExisting(selectedItem, clientListView))
+        if (!isFileExisting(selectedItem, clientListView)) {
             ConnectionSingleton.getInstance().sendMessage(new Message(MessageType.FILE_REQUEST, selectedItem));
+            Platform.runLater(() -> mainLabel.setText("Downloading " + selectedItem + "..."));
+        }
     }
 
     private String getSelectedAndClearSelection(ListView<String> listView) {
@@ -181,9 +196,11 @@ public class MainController implements Initializable {
         if (selectedItem == null) {
             return;
         }
-        Path file = Paths.get(Info.CLIENT_FOLDER_NAME + selectedItem);
+        Path file = Paths.get(currentClientDir + selectedItem);
+        System.out.println(file);
         if (Files.isDirectory(file)) return; //can't send directories now
         if (!isFileExisting(file.getFileName().toString(), serverListView)) {
+            mainLabel.setText(mainLabel.getText() + "; " + selectedItem + " is next");
             taskQueue.put(() -> {
                 try {
                     Platform.runLater(() -> mainLabel.setText("Sending " + selectedItem + "..."));
@@ -216,7 +233,7 @@ public class MainController implements Initializable {
             for (File file : list) {
                 try {
                     Files.copy(file.toPath(),
-                            Paths.get(Info.CLIENT_FOLDER_NAME + file.getName()),
+                            Paths.get(currentClientDir + file.getName()),
                             StandardCopyOption.REPLACE_EXISTING);
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -230,9 +247,10 @@ public class MainController implements Initializable {
         String selectedItem = getSelectedAndClearSelection(clientListView);
         if (selectedItem == null) return;
         try {
-            Files.delete(Paths.get(Info.CLIENT_FOLDER_NAME + selectedItem));
+            Files.delete(Paths.get(currentClientDir + selectedItem + "\\"));
+            System.out.println("deleting " + currentClientDir + selectedItem + "\\");
         } catch (DirectoryNotEmptyException e) {
-            GUIhelper.showAlert("The folder is not empty!", "Warning!", "Cannot delete folder",
+            GUIhelper.showAlert("The folder is not empty!", "Cannot delete folder", "Warning!",
                     Alert.AlertType.WARNING);
         } catch (IOException e) {
             e.printStackTrace();
@@ -240,19 +258,37 @@ public class MainController implements Initializable {
         refreshClientsFilesList();
     }
 
-    public void openFileInDesktop(MouseEvent mouseEvent) {
+    public void handleClientMouseClicked(MouseEvent mouseEvent) {
         if (mouseEvent.getClickCount() == 2) {
             String selected = clientListView.getSelectionModel().getSelectedItem();
             if (selected == null) return;
-            Path file = Paths.get(Info.CLIENT_FOLDER_NAME + selected);
-            if (!Files.isDirectory(file)) {
+
+            if (clientListView.getSelectionModel().getSelectedItem().equals("..")) {
+                String dirWithoutSlash = currentClientDir.substring(0, currentClientDir.length() - 1);
+                //one level up directory
+                currentClientDir = dirWithoutSlash.substring(0, dirWithoutSlash.lastIndexOf('\\') + 1);
+                mainLabel.setText(currentClientDir);
+                refreshClientsFilesList();
+                return;
+            }
+
+            Path path = Paths.get(currentClientDir + "\\" + selected);
+            if (Files.isDirectory(path)) {
+                currentClientDir = path.toString() + "\\";
+                mainLabel.setText(currentClientDir);
+                refreshClientsFilesList();
+            } else {
                 try {
-                    Desktop.getDesktop().open(file.toFile());
+                    Desktop.getDesktop().open(path.toFile());
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
             }
         }
+    }
+
+    private boolean isClientRootFolder() throws IOException {
+        return Files.isSameFile(Paths.get(Info.CLIENT_FOLDER_NAME), Paths.get(currentClientDir));
     }
 
     public void exit() {
@@ -285,5 +321,9 @@ public class MainController implements Initializable {
 
     public void setPrimaryStage(Stage primaryStage) {
         this.primaryStage = primaryStage;
+    }
+
+    public String getCurrentClientDir() {
+        return currentClientDir;
     }
 }

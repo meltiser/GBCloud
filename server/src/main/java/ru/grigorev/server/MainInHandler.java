@@ -29,7 +29,7 @@ public class MainInHandler extends ChannelInboundHandlerAdapter {
             if (msg == null) return;
             if (fileHandler == null) fileHandler = new FileHandler();
             Message message = (Message) msg;
-            login = message.getLogin() + "/";
+            login = message.getLogin() + "\\";
             Path file = Paths.get(Info.SERVER_FOLDER_NAME + login + message.getFileName());
             if (!fileHandler.checkFolderExisting(Info.SERVER_FOLDER_NAME + login))
                 ctx.writeAndFlush(getRefreshResponseMessage());
@@ -45,7 +45,7 @@ public class MainInHandler extends ChannelInboundHandlerAdapter {
                 Files.write(file, message.getByteArr(), StandardOpenOption.CREATE);
             }
             if (message.getType().equals(MessageType.FILE_PART)) {
-                System.out.println(MessageType.FILE_PART + " : " + message.getCurrentPart() + "/" + message.getPartsCount());
+                System.out.println(MessageType.FILE_PART + " : " + message.getCurrentPart() + "\\" + message.getPartsCount());
 
                 if (!fileHandler.isWriting()) fileHandler.startWriting(file);
                 fileHandler.continueWriting(message);

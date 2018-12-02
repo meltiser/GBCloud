@@ -18,7 +18,7 @@
     <Label fx:id="mainLabel" alignment="CENTER"/>
     <HBox VBox.vgrow="ALWAYS">
         <VBox HBox.hgrow="ALWAYS">
-            <ListView fx:id="clientListView" VBox.vgrow="ALWAYS" onMouseClicked="#openFileInDesktop"/>
+            <ListView fx:id="clientListView" VBox.vgrow="ALWAYS" onMouseClicked="#handleClientMouseClicked"/>
             <HBox>
                 <Button text="Send file" onAction="#sendFile"
                         HBox.hgrow="ALWAYS"/>
