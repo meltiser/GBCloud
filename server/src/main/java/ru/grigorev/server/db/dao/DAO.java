@@ -9,7 +9,7 @@ import java.util.List;
  * @author Dmitriy Grigorev
  */
 public interface DAO {
-    List<User> getAllUsers() throws SQLException;
+    User getUserByLogin(String login) throws SQLException;
 
     void insertNewUser(User user) throws SQLException;
 }

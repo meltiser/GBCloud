@@ -18,7 +18,6 @@ import java.util.Optional;
 public class AuthInHandler extends ChannelInboundHandlerAdapter {
     private boolean isAuthorized;
     private DAO dao;
-    private List<User> users;
     private String login;
 
     public AuthInHandler(DAO dao) {
@@ -28,7 +27,6 @@ public class AuthInHandler extends ChannelInboundHandlerAdapter {
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
         System.out.println("Client has connected (Auth Handler)");
-        users = dao.getAllUsers();
     }
 
     @Override
@@ -41,13 +39,7 @@ public class AuthInHandler extends ChannelInboundHandlerAdapter {
                 AuthMessage message = (AuthMessage) msg;
                 login = message.getLogin();
                 String password = message.getPassword();
-                User foundUser = null;
-                for (User user : users) {
-                    if (user.getLogin().equals(login)) {
-                        foundUser = user;
-                        break;
-                    }
-                }
+                User foundUser = dao.getUserByLogin(login);
                 if (message.getType().equals(MessageType.SIGN_IN_REQUEST)) {
                     if (foundUser == null)
                         ctx.writeAndFlush(new AuthMessage(MessageType.AUTH_FAIL, "No such user or incorrect login!"));
@@ -62,7 +54,6 @@ public class AuthInHandler extends ChannelInboundHandlerAdapter {
                 if (message.getType().equals(MessageType.SIGN_UP_REQUEST)) {
                     if (foundUser == null) {
                         dao.insertNewUser(new User(login, password));
-                        users = dao.getAllUsers();
                         isAuthorized = true;
                         ctx.writeAndFlush(new AuthMessage(MessageType.AUTH_OK, "You have successfully signed up!"));
                     } else

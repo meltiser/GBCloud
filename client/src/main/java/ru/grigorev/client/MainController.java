@@ -210,7 +210,6 @@ public class MainController implements Initializable {
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
-                sendServerRefreshFileListMessage();
             });
             singleThreadExecutor.submit(taskQueue.poll());
         }

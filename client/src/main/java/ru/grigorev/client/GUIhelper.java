@@ -48,7 +48,7 @@ public class GUIhelper {
         MenuItem aboutItem = new MenuItem("About");
         aboutItem.setOnAction(event -> {
             String selected = clientListView.getSelectionModel().getSelectedItem();
-            if (selected == null) return;
+            if (selected == null || selected.equals("..")) return;
             long size = 0;
             FileTime lastModified = null;
             try {
@@ -66,7 +66,7 @@ public class GUIhelper {
         MenuItem renameItem = new MenuItem("Rename");
         renameItem.setOnAction(event -> {
             String selected = clientListView.getSelectionModel().getSelectedItem();
-            if (selected == null) return;
+            if (selected == null || selected.equals("..")) return;
             Path gottenFile = Paths.get(mainController.getCurrentClientDir() + selected);
             String renamed = showInputDialog(selected, "Renaming...", "Enter new file name: ");
             if (renamed.equals("") || renamed.equals(selected)) {

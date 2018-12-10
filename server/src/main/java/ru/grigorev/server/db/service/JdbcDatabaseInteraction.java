@@ -4,10 +4,7 @@ import ru.grigorev.server.db.dao.DAO;
 import ru.grigorev.server.db.dao.JdbcDAOimpl;
 import ru.grigorev.server.db.model.User;
 
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.SQLException;
-import java.sql.Statement;
+import java.sql.*;
 import java.util.List;
 
 /**
@@ -51,13 +48,20 @@ public class JdbcDatabaseInteraction implements DatabaseInteraction {
 
             createSchemaIfNotExists(statement);
             createTableIfNotExists(statement);
-            List<User> users = dao.getAllUsers();
-            if (users.isEmpty()) insertExampleUsers();
+            if (isDataBaseEmpty()) insertExampleUsers();
 
             statement.close();
         } catch (SQLException e) {
             throw new RuntimeException("Failed to prepare database", e);
         }
+    }
+
+    private boolean isDataBaseEmpty() throws SQLException {
+        String query = "SELECT COUNT(*) FROM \"UsersSchema\".\"Users\";";
+        Statement statement = connection.createStatement();
+        ResultSet resultSet = statement.executeQuery(query);
+        resultSet.next();
+        return resultSet.getInt(1) == 0;
     }
 
     public void insertExampleUsers() throws SQLException {
